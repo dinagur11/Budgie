@@ -46,6 +46,7 @@ export async function getMembers(householdId: number) {
 
 export async function leaveHousehold(householdId: number, userId: number) {
     return prisma.$transaction(async (tx) => {
+        await lockHousehold(householdId, tx);
         await markLeft(householdId, userId, tx);
         const membership = await tx.householdMember.findUnique({
             where: { userId_householdId: { userId, householdId } },
@@ -78,6 +79,7 @@ export async function leaveHousehold(householdId: number, userId: number) {
 
 export async function removeMember(householdId: number, userId: number){
     return prisma.$transaction(async (tx) => {
+        await lockHousehold(householdId, tx);
         await markLeft(householdId, userId, tx);
     })
 }
@@ -96,6 +98,8 @@ async function markLeft(householdId: number, userId: number, tx: Prisma.Transact
 
 export async function deleteHousehold(householdId: number){
     return prisma.$transaction(async (tx) => {
+        if (!(await lockHousehold(householdId, tx)))
+            throw new HttpError(404, "Household not found");
         await deleteHouseholdHelper(householdId, tx);
     })
 }
@@ -105,4 +109,11 @@ async function deleteHouseholdHelper(householdId: number, tx: Prisma.Transaction
     await tx.recurringRule.deleteMany({ where: { householdId } });
     await tx.householdMember.deleteMany({ where: { householdId } });
     await tx.household.delete({ where: { id: householdId } });
+}
+
+//locks the household row until the transaction ends, so membership changes (leave, remove, join, delete)
+//and invite creation on one household run one at a time; returns false if the household no longer exists
+export async function lockHousehold(householdId: number, tx: Prisma.TransactionClient): Promise<boolean> {
+    const rows = await tx.$queryRaw<{ id: number }[]>`SELECT "id" FROM "Household" WHERE "id" = ${householdId} FOR UPDATE`;
+    return rows.length === 1;
 }

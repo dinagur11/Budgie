@@ -272,11 +272,11 @@ describe("household id validation on every /households/:id route", () => {
 
   for (const [label, call] of routes) {
     for (const id of INVALID_IDS) {
-      it(`${label} returns 400 "invalid id" for ${JSON.stringify(id)}`, async () => {
+      it(`${label} returns 400 "Invalid id" for ${JSON.stringify(id)}`, async () => {
         const user = await createUser();
         const res = await call(user, encodeURIComponent(id));
         expect(res.status).toBe(400);
-        expect(res.body).toStrictEqual({ error: "invalid id" });
+        expect(res.body).toStrictEqual({ error: "Invalid id" });
       });
     }
 

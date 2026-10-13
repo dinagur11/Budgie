@@ -127,6 +127,9 @@ CREATE INDEX "Expense_householdId_categoryId_idx" ON "Expense"("householdId", "c
 CREATE INDEX "Expense_householdId_paidById_idx" ON "Expense"("householdId", "paidById");
 
 -- CreateIndex
+CREATE INDEX "Expense_categoryId_idx" ON "Expense"("categoryId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Expense_recurringRuleId_date_key" ON "Expense"("recurringRuleId", "date");
 
 -- CreateIndex
@@ -134,6 +137,9 @@ CREATE INDEX "RecurringRule_nextOccurrence_idx" ON "RecurringRule"("nextOccurren
 
 -- CreateIndex
 CREATE INDEX "RecurringRule_householdId_idx" ON "RecurringRule"("householdId");
+
+-- CreateIndex
+CREATE INDEX "RecurringRule_categoryId_idx" ON "RecurringRule"("categoryId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Invite_tokenHash_key" ON "Invite"("tokenHash");
@@ -180,6 +186,4 @@ ALTER TABLE "RecurringRule" ADD CONSTRAINT "RecurringRule_categoryId_fkey" FOREI
 -- AddForeignKey
 ALTER TABLE "Invite" ADD CONSTRAINT "Invite_householdId_fkey" FOREIGN KEY ("householdId") REFERENCES "Household"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- Case-insensitive uniqueness for category names (built-ins use householdId 0)
-CREATE UNIQUE INDEX "Category_household_lower_name_key"
-ON "Category" (COALESCE("householdId", 0), lower("name"));
+CREATE UNIQUE INDEX "Category_household_lower_name_key" ON "Category" (COALESCE("householdId", 0), lower("name"));

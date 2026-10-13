@@ -19,8 +19,8 @@ Budgie/
         app.ts          Express app (no listen)
         server.ts       starts the server
         lib/validate.ts input validators (see Validation)
-        routes/         households.ts, me.ts (health.ts if present)
-        services/       householdsService.ts, ... (the me functions live in their own service)
+        routes/         householdsRouter.ts (households and invites), meRouter.ts
+        services/       householdsService.ts, invitesService.ts, meService.ts, categoriesService.ts
         middleware/     errorHandler.ts (HttpError), auth.ts (requireAuth), household.ts (requireMember, requireOwner)
 ```
 
@@ -67,22 +67,32 @@ Schema changes always go through a new `prisma migrate dev --name <change>`. Nev
 **Categories**
 - One `Category` table. Built-ins have `householdId = null` and are seeded by `prisma/seed.ts` (including "Other"). Custom categories have a `householdId` and cascade-delete with the household.
 - Built-ins cannot be renamed or deleted. Custom categories can be edited and archived (`isArchived`).
-- Case-insensitive uniqueness, including built-ins, comes from the hand-written index `Category_household_lower_name_key` on `(COALESCE("householdId", 0), lower("name"))`. `@@unique([householdId, name])` alone does not protect built-ins because nulls are distinct in Postgres.
+- The hand-written index `Category_household_lower_name_key` on `(COALESCE("householdId", 0), lower("name"))` guarantees case-insensitive uniqueness only inside one bucket: the built-ins are one bucket (keyed `0`), each household is its own. (`@@unique([householdId, name])` alone would not even keep built-ins unique among themselves, because nulls are distinct in Postgres.) A household name clashing with a built-in is checked in the service, not by the index: a raw tagged-template `$queryRaw` with `"householdId" IS NULL AND lower("name") = lower(${name}) LIMIT 1`, the same folding as the index. Not Prisma's `mode: "insensitive"`, which compiles to `ILIKE` and treats `%` and `_` as wildcards.
 - Category picker query: `OR: [{ householdId: null }, { householdId }]`, excluding archived.
+- A category is built-in when `householdId` is null. Every category response has the shape `{ id, name, isArchived, isBuiltIn }`, never the household id.
+- Names are unique case-insensitively across the built-ins and the household's categories, archived ones included (an archived name stays reserved). Within a household the unique index enforces it. The index keys built-ins as household `0`, so it does not catch a clash with a built-in: create and rename check the built-ins first (built-ins only change through the seed, so that check has no race).
+- At most 100 custom categories per household, archived ones included (`MAX_CATEGORIES_PER_HOUSEHOLD` in `categoriesService.ts`). Built-ins don't count.
+- Archiving is the way to retire a category that is in use (expenses keep it). An archived name stays reserved: to use that name again, unarchive the archived category (or rename it).
 
 **Expenses**
 - Fields: amount, currency, `date` (`@db.Date`), category, `paidBy` and `createdBy` (both `User`, relations `PaidExpenses` / `CreatedExpenses`), household, optional description, optional `recurringRuleId`.
-- `@@unique([recurringRuleId, date])`. Indexes: `(householdId, date)`, `(householdId, categoryId)`, `(householdId, paidById)`.
+- `@@unique([recurringRuleId, date])`. Indexes: `(householdId, date)`, `(householdId, categoryId)`, `(householdId, paidById)`, `(categoryId)`.
 
 **Recurring rules** (not implemented yet, being rewritten by the developer)
 - `Frequency`: `DAILY`, `WEEKLY`, `BIWEEKLY`, `MONTHLY`, `YEARLY`. A rule is a template (name, amount, currency, category, payer, `createdBy`) plus a schedule (`startDate`, optional `endDate`, nullable `nextOccurrence`, `dayOfMonth` for monthly only).
 - There is no skip table (`RecurringRuleSkip` was removed). Deleting a rule keeps its past expenses (link set to null).
+- Indexes: `(categoryId)`, `(householdId)`, `(nextOccurrence)`.
 
 **Receipts**
 - No Receipt table. The flow is synchronous: upload to S3, backend calls the LLM and returns suggestions, the user confirms in the app, the app creates a normal expense, the backend deletes the image. An S3 lifecycle rule expires abandoned images.
 
-**Invites** (not rewritten yet)
-- Shareable links sent manually by the owner. `Invite`: `householdId`, `tokenHash` (unique, SHA-256 of a random token; the raw token is returned once at creation and never stored), `status` (`PENDING`, `ACCEPTED`, `EXPIRED`), `expiresAt` (7 days), `createdAt`, `acceptedAt`. Single-use. Accept in one transaction with a conditional `updateMany` and a count check.
+**Invites** (implemented in `services/invitesService.ts`)
+- Shareable links sent manually by the owner. `Invite`: `householdId`, `tokenHash` (unique, SHA-256 hex of a random token; the raw token is returned once at creation and never stored or logged), `status` (`PENDING`, `ACCEPTED`, `EXPIRED`), `expiresAt` (7 days), `createdAt`, `acceptedAt`. Single-use.
+- Token: `crypto.randomBytes(32)` as base64url (43 characters). Incoming tokens are hashed before the lookup. Tokens travel only in the JSON body, never in the URL. The backend returns the token, the app builds the link.
+- At most 25 active invites per household (active = `PENDING` and `expiresAt` in the future). Owners can list active invites and cancel one (the row is deleted).
+- Creating an invite and accepting one lock the household row first (`lockHousehold` in `householdsService.ts`, `SELECT … FOR UPDATE`), so the cap can't be exceeded and a join can't race with leave, remove or delete.
+- Expiry is computed on the fly from `expiresAt`; request handlers never write `EXPIRED`. Later: a cleanup job that sets `EXPIRED` on old pending invites (and maybe deletes old invites). Not built yet.
+- Accept runs in one transaction: look up by hash and check (404 unknown, 410 expired, 410 used), then 409 if the caller is already an active member (the invite is not consumed), then claim with a conditional `updateMany` (`id`, `PENDING`, `expiresAt > now`) and a count check (410 if not exactly 1), then add the member. A former member's row is reactivated (`leftAt` null, role `MEMBER`, never `OWNER`, `joinedAt` reset to now); otherwise a `MEMBER` row is created.
 
 ## Implemented endpoints
 
@@ -101,8 +111,30 @@ All routes require `requireAuth` (mounted in `app.ts`). Protected household rout
 
 `/:id/members/me` is registered **before** `/:id/members/:userId`, otherwise `me` would be parsed as a user id.
 
+**Invites** (on the households router)
+| Method and path | Who | Behavior |
+|---|---|---|
+| `POST /:id/invites` | owner | Creates a single-use link valid for 7 days. `201` `{ token, expiresAt }`; the raw token is returned only here. `409` if the household already has 25 active invites. |
+| `GET /:id/invites` | owner | Active invites, newest first: `[{ id, createdAt, expiresAt }]`. Never anything token-related. |
+| `DELETE /:id/invites/:inviteId` | owner | Cancels an invite (deletes the row, filtered by invite id and the caller's household). `:inviteId` checked with `validId`. `204`. `404 "Invite not found"` if no such invite in this household. |
+| `POST /join/preview` | any user | Body `{ token }`. `200` `{ householdName, members: [{ name, role }] }`, active members ordered by `joinedAt`. No emails or ids. Changes nothing. |
+| `POST /join` | any user | Body `{ token }`. Joins as `MEMBER`. `200` `{ id, name, defaultCurrency, timeZone, role: "MEMBER" }`. |
+
+Errors for both join routes: `400 "Invalid token"` (not a string of 1 to 128 characters), `404 "Invite not found"`, `410 "Invite has expired"`, `410 "Invite was already used"`, and on `/join` only `409 "Already a member of this household"`. `/join/preview` and `/join` are registered **before** the `/:id` routes.
+
+**Categories** (`/households/:id/categories`, in `services/categoriesService.ts`)
+| Method and path | Who | Behavior |
+|---|---|---|
+| `POST /` | member | Body `{ name }` (trimmed, 1 to 100 characters). `201` `{ id, name, isArchived, isBuiltIn }`. `409 "A category with this name already exists"` for a case-insensitive duplicate of a built-in or of a household category, archived ones included. `409 "Category limit reached"` when the household already has 100 categories (archived included). Runs in a transaction that locks the household row first (`404 "Household not found"` if it is gone), then checks the built-ins, counts and creates. |
+| `GET /` | member | Picker list: built-ins plus the household's categories, ordered by name case-insensitively (sorted in the service with `localeCompare`, sensitivity `base`, ties by id; not by the database collation): `[{ id, name, isArchived, isBuiltIn }]`. Archived excluded unless `?includeArchived=true`; `false` is also accepted; any other value or a repeated parameter returns `400`. |
+| `PATCH /:categoryId` | member | Body `{ name?, isArchived? }` (`isArchived` must be a JSON boolean, otherwise `400 "isArchived must be true or false"`). `200` `{ id, name, isArchived, isBuiltIn }`. `400 "Nothing to update"` if neither is given. `403 "Built-in categories can't be changed"`. `404 "Category not found"` for another household's category or a missing id (the final update filters by id and household id). `409` for a duplicate name. |
+| `DELETE /:categoryId` | owner | Deletes an unused custom category. `204`. `403 "Built-in categories can't be deleted"`. `404 "Category not found"` for another household's category or a missing id. `409` if an expense or a recurring rule uses it (archive it instead). |
+
+`:categoryId` is checked with `validId` (`400 "Invalid id"`). There is no route to get a single category; the app uses the list.
+
 **Leave rules**
 - A MEMBER just leaves. An OWNER leaving while another active owner exists just leaves. If no active owner remains, a random active member is promoted to OWNER. If nobody is left, the household and all its data are deleted. All in one transaction.
+- Leave, remove, delete, invite creation and invite accept all lock the household row first (`lockHousehold`, `SELECT … FOR UPDATE`), so concurrent membership changes on one household run one at a time. `DELETE /:id` returns `404` if the household is already gone.
 - Deleting a household deletes, in this order and in one transaction: expenses, recurring rules, member rows, the household. Categories and invites cascade.
 
 **Me** (`/me`)
@@ -114,10 +146,14 @@ All routes require `requireAuth` (mounted in `app.ts`). Protected household rout
 
 ## API conventions
 
-- Status codes: `400` validation errors, `400 "invalid id"` for a malformed household id (not a positive integer up to 2147483647), checked before any membership lookup, `400` / `413` / `415` for a malformed, oversized or unsupported request body, `401` missing or invalid token, `403` a member calling an owner-only route, `404` for a non-member of an existing household or someone who left (existence is not revealed), `404` for a member who is not found on leave or remove.
+- Status codes: `400` validation errors, `400 "Invalid id"` for a malformed household id (not a positive integer up to 2147483647), checked before any membership lookup, `400` / `413` / `415` for a malformed, oversized or unsupported request body, `401` missing or invalid token, `403` a member calling an owner-only route, `404` for a non-member of an existing household or someone who left (existence is not revealed), `404` for a member who is not found on leave or remove.
+- Categories: `403` for changing or deleting a built-in, `404` for a category of another household or a missing one (same response for both), `409` for a duplicate name or for deleting a category that is in use. The picker excludes archived categories unless `?includeArchived=true`.
+- Deleting a category runs in a transaction: it first checks that the category belongs to the caller's household (so nobody can lock a built-in or another household's category), then locks the category row (`lockCategory`, `SELECT … FOR UPDATE`), then checks for expenses and recurring rules that use it; the foreign key is the final guard. A concurrent expense insert either completes first (the delete returns `409`) or fails on the foreign key after the delete.
+- Lock order: the household row first, then the category row. `createCategory` locks the household row (`lockHousehold`); `deleteCategory` locks only the category row (`lockCategory`). No transaction takes both today; one that does must follow this order.
 - Deletes return `204` with no body (`res.status(204).end()`). Updates return `200`. Creates return `201`.
 - Routers validate input and pass clean values to services. Services do not re-validate.
 - Throw `HttpError(status, message)` from `middleware/errorHandler.ts` for expected errors; Express 5 forwards async errors, so no try/catch wrappers.
+- Error messages start with a capital letter (`"Invalid id"`, `"Category not found"`), except when they start with a field name, which keeps its own spelling (`"isArchived must be true or false"`). Say "built-in", never "default", for seeded categories.
 - `requireMember` reads `req.params.id`, loads the membership (404 if missing or `leftAt` is set) and sets `req.membership`. `requireOwner` needs `requireMember` first and returns `403` unless the role is OWNER. Handlers use `req.membership` for the household id and role instead of re-parsing.
 - Keep `app.ts` (builds the app) separate from `server.ts` (listens), so tests import the app.
 - Use the single shared Prisma client from `src/prisma.ts`. Prisma does not index foreign keys automatically; add indexes deliberately.
@@ -127,7 +163,8 @@ All routes require `requireAuth` (mounted in `app.ts`). Protected household rout
 - `validName`: string, trimmed, 1 to 100 characters.
 - `validCurrency`: must be a value of the `Currency` enum.
 - `validTimeZone`: valid IANA zone via `Intl.DateTimeFormat`; returns the normalized name.
-- `validId`: positive integer, otherwise `HttpError(400, "invalid id")`.
+- `validId`: positive integer with no leading zeros, at most 2147483647, otherwise `HttpError(400, "Invalid id")`.
+- `validBoolean`: strict `typeof value === "boolean"` (no `"true"`, `0`, `null`), otherwise `HttpError(400, "<field> must be true or false")` when called as `validBoolean(value, field)`, or `"Invalid boolean value"` without a field name.
 - `optional(value, validator)`: returns `undefined` when the value is `undefined`, otherwise runs the validator.
 
 ## Testing
@@ -151,6 +188,8 @@ Use Vitest with Supertest against the real Express app (`import { app } from "..
 - Leave and remove: member leaves; sole owner leaves with members left (someone is promoted to OWNER and still active); one of two owners leaves (nobody is promoted); last person leaves (household and its expenses, rules and members are gone); owner removes a member; owner tries to remove themselves (`400`); removing a non-member or someone who already left (`404`); leaving twice (`404`); the route order (`DELETE /:id/members/me` must not be treated as a user id).
 - `DELETE /:id` removes the household together with its expenses, recurring rules and members, created directly with Prisma for the test.
 - `/me`: profile, households list (only active households, correct roles), rename, rename with invalid input, and that renaming does not change the email.
+- Invites: create, list and cancel (owner only, 25-invite cap); preview and join (invalid, unknown, expired and used tokens, already a member, a former member rejoining as `MEMBER`); the raw token never appears outside the create response; concurrent accepts, the cap under concurrent creates, and a join racing leave or delete (never `500`).
+- Categories: create, list, rename, archive and delete; case-insensitive duplicates against the household, its archived categories and the built-ins; `includeArchived` parsing; `403` for built-ins, `404` for another household's or a missing category; `409` for deleting a used category (expenses or rules, archived or not); concurrent creates and renames (never `500`); a delete racing an expense insert (never an orphan); no `householdId` or other household's data in any response.
 
 When finished, give a short report: tests written, tests passing, and a list of every failure or suspicious behavior with the details described above.
 
@@ -160,7 +199,7 @@ Never read, open, print or commit `.env` files or any API keys, tokens or connec
 
 ## Status
 
-Done: schema and a single clean migration, seeded categories, Cognito user pool, `requireAuth`, `requireMember` / `requireOwner`, validators, the household routes and services, the `/me` routes.
+Done: schema and a single clean migration, seeded categories, Cognito user pool, `requireAuth`, `requireMember` / `requireOwner`, validators, the household routes and services, the `/me` routes, invites (create, list, cancel, preview, join), categories (create, list, update, delete; done and tested).
 
 ## Not decided yet
 

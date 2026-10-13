@@ -35,10 +35,16 @@ export function validTimeZone(value: unknown): string {
 export function validId(value: unknown): number {
   const text = typeof value === "number" ? String(value) : value;
   if (typeof text !== "string" || !/^[1-9]\d*$/.test(text))
-    throw new HttpError(400, "invalid id");
+    throw new HttpError(400, "Invalid id");
 
   const id = Number(text);
   if (id < 1 || id > MAX_INT)
-    throw new HttpError(400, "invalid id");
+    throw new HttpError(400, "Invalid id");
   return id;
+}
+
+export function validBoolean(value: unknown, field?: string): boolean {
+  if (typeof value !== "boolean")
+    throw new HttpError(400, field ? `${field} must be true or false` : "Invalid boolean value");
+  return value;
 }

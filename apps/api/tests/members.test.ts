@@ -180,3 +180,40 @@ describe("DELETE /households/:id/members/:userId (remove)", () => {
     });
   }
 });
+
+describe("concurrent leaves (household row lock)", () => {
+  it("both owners leaving at once: the remaining member is promoted", async () => {
+    for (let round = 0; round < 5; round++) {
+      const o1 = await createUser();
+      const o2 = await createUser();
+      const m = await createUser();
+      const h = await createHousehold("Home", o1);
+      await addMember(h.id, o2.id, "OWNER");
+      await addMember(h.id, m.id);
+      const results = await Promise.all([
+        as(o1).delete(`/households/${h.id}/members/me`),
+        as(o2).delete(`/households/${h.id}/members/me`),
+      ]);
+      expect(results.map((r) => r.status)).toStrictEqual([204, 204]);
+      expect(await membership(h.id, m.id)).toMatchObject({ role: "OWNER", leftAt: null });
+    }
+  });
+
+  it("the last two members leaving at once: the household is deleted", async () => {
+    for (let round = 0; round < 5; round++) {
+      const o = await createUser();
+      const m = await createUser();
+      const h = await createHousehold("Home", o);
+      await addMember(h.id, m.id);
+      await addHouseholdData(h.id, o.id);
+      const results = await Promise.all([
+        as(o).delete(`/households/${h.id}/members/me`),
+        as(m).delete(`/households/${h.id}/members/me`),
+      ]);
+      expect(results.map((r) => r.status)).toStrictEqual([204, 204]);
+      expect(await countHouseholdData(h.id)).toStrictEqual({
+        households: 0, members: 0, expenses: 0, rules: 0, categories: 0, invites: 0,
+      });
+    }
+  });
+});

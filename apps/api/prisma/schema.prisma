@@ -137,6 +137,7 @@ model Expense{
     @@index([householdId, categoryId])
     @@index([householdId, paidById])
     @@unique([recurringRuleId, date])
+    @@index([categoryId])
 }
 
 model RecurringRule{
@@ -164,6 +165,7 @@ model RecurringRule{
 
     @@index([nextOccurrence])
     @@index([householdId])
+    @@index([categoryId])
 }
 
 model Invite {
