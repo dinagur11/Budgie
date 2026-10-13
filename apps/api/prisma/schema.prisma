@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+    OWNER
+    MEMBER
+}
+
+enum InviteStatus {
+    PENDING
+    ACCEPTED
+    EXPIRED
+}
+
+enum Currency {
+    ILS
+    USD
+    EUR
+    GBP
+    RUB
+    CAD
+    AUD
+    NZD
+    CHF
+    SEK
+    NOK
+    DKK
+    PLN
+    CZK
+    HUF
+    TRY
+    UAH
+    CNY
+    INR
+    BRL
+    MXN
+    ZAR
+    SGD
+    HKD
+    THB
+    PHP
+    AED
+    SAR
+    EGP
+}
+
+enum Frequency {
+    DAILY
+    WEEKLY
+    BIWEEKLY
+    MONTHLY
+    YEARLY
+}
+
+model User{
+    id Int @id @default(autoincrement())
+    cognitoId String @unique
+    name String
+    email String @unique
+    createdAt DateTime @default(now())
+    paidExpenses Expense[] @relation("PaidExpenses")
+    createdExpenses Expense[] @relation("CreatedExpenses")
+    paidRecurring RecurringRule[] @relation("PaidRecurring")
+    createdRecurring RecurringRule[] @relation("CreatedRecurring")
+
+    memberships HouseholdMember[]
+}
+
+model Household{
+    id Int @id @default(autoincrement())
+    name String
+    createdAt DateTime @default(now())
+    categories Category[]
+    expenses Expense[]
+    defaultCurrency Currency @default(USD)
+    timeZone String @default("UTC") // IANA zone name; decides "today" for recurring rules
+    recurringRules RecurringRule[]
+    invites Invite[]
+
+    members HouseholdMember[]
+}
+
+model HouseholdMember{
+    userId Int
+    householdId Int
+    role Role @default(MEMBER)
+    joinedAt DateTime  @default(now())
+    leftAt DateTime?
+
+    user User @relation(fields: [userId], references: [id])
+    household Household @relation(fields: [householdId], references: [id])
+
+    @@id([userId, householdId])
+    @@index([householdId])
+}
+
+model Category{
+    id Int @id @default(autoincrement())
+    householdId Int? //default categories don't have an householdId
+    name String
+    isArchived Boolean @default(false)
+    expenses Expense[]
+    recurringRules RecurringRule[]
+
+    household Household? @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+    @@unique([householdId, name])
+}
+
+model Expense{
+    id Int @id @default(autoincrement())
+    amount Int
+    currency Currency 
+    date DateTime @db.Date
+    categoryId Int
+    paidBy User @relation("PaidExpenses", fields: [paidById], references: [id])
+    paidById Int
+    createdBy User @relation("CreatedExpenses", fields: [createdById], references: [id])
+    createdById Int
+    householdId Int
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    description String?
+    recurringRuleId Int?
+
+    household Household @relation(fields: [householdId], references: [id])
+    category Category @relation(fields: [categoryId], references: [id])
+    recurringRule RecurringRule? @relation(fields: [recurringRuleId], references: [id])
+
+    @@index([householdId, date])
+    @@index([householdId, categoryId])
+    @@index([householdId, paidById])
+    @@unique([recurringRuleId, date])
+}
+
+model RecurringRule{
+    id Int @id @default(autoincrement())
+    name String
+    amount Int
+    currency Currency
+    frequency Frequency
+    dayOfMonth Int? //for monthly rules
+    startDate DateTime @db.Date
+    endDate DateTime? @db.Date
+    nextOccurrence DateTime? @db.Date // null once the rule has no more occurrences
+    householdId Int
+    paidById Int
+    createdById Int 
+    categoryId Int
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    createdBy User @relation("CreatedRecurring", fields: [createdById], references: [id])
+    paidBy User @relation("PaidRecurring", fields: [paidById], references: [id])
+    household Household @relation(fields: [householdId], references: [id])
+    category Category @relation(fields: [categoryId], references: [id])
+    expenses Expense[]
+
+    @@index([nextOccurrence])
+    @@index([householdId])
+}
+
+model Invite {
+    id Int @id @default(autoincrement())
+    householdId  Int
+    tokenHash String @unique   // SHA-256 of the random token in the link; the token itself is never stored
+    status InviteStatus @default(PENDING)
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+    acceptedAt DateTime?
+
+    household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+    @@index([householdId, status])
+}
+
+
