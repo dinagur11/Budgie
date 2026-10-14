@@ -63,7 +63,7 @@ describe("PATCH /me", () => {
     const h = await createHousehold("Home", user);
     await as(user).patch("/me").send({ name: "Renamed" });
     const list = await as(user).get(`/households/${h.id}/members`);
-    expect(list.body).toStrictEqual([{ userId: user.id, name: "Renamed", role: "OWNER" }]);
+    expect(list.body).toStrictEqual([{ userId: user.id, name: "Renamed", role: "OWNER", isActive: true }]);
   });
 
   const bad: [string, object | undefined][] = [

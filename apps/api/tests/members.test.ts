@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  prisma, as, createUser, createHousehold, addMember, addHouseholdData, countHouseholdData, INVALID_IDS,
+  prisma, as, createUser, createHousehold, addMember, addHouseholdData, countHouseholdData, INVALID_IDS, expectNoSensitiveFields,
 } from "./helpers.js";
 
 async function membership(householdId: number, userId: number) {
@@ -214,6 +214,92 @@ describe("concurrent leaves (household row lock)", () => {
       expect(await countHouseholdData(h.id)).toStrictEqual({
         households: 0, members: 0, expenses: 0, rules: 0, categories: 0, invites: 0,
       });
+    }
+  });
+});
+
+describe("GET /households/:id/members?includeFormer", () => {
+  const list = (u: { id: number }, hid: number, qs = "") => as(u).get(`/households/${hid}/members${qs}`);
+
+  // owner (OWNER), stays (MEMBER), leaver (left via the API), removed (removed by the owner)
+  async function household() {
+    const owner = await createUser("Olga");
+    const stays = await createUser("Sam");
+    const leaver = await createUser("Lea");
+    const removed = await createUser("Rob");
+    const h = await createHousehold("Home", owner);
+    await prisma.householdMember.update({ where: { userId_householdId: { userId: owner.id, householdId: h.id } }, data: { joinedAt: new Date("2026-01-01") } });
+    await addMember(h.id, stays.id, "MEMBER", { joinedAt: new Date("2026-02-01") });
+    await addMember(h.id, leaver.id, "MEMBER", { joinedAt: new Date("2026-03-01") });
+    await addMember(h.id, removed.id, "MEMBER", { joinedAt: new Date("2026-04-01") });
+    expect((await as(leaver).delete(`/households/${h.id}/members/me`)).status).toBe(204);
+    expect((await as(owner).delete(`/households/${h.id}/members/${removed.id}`)).status).toBe(204);
+    return { owner, stays, leaver, removed, h };
+  }
+
+  it("default and includeFormer=false: active members only, each with isActive true", async () => {
+    const { owner, stays, h } = await household();
+    const expected = [
+      { userId: owner.id, name: "Olga", role: "OWNER", isActive: true },
+      { userId: stays.id, name: "Sam", role: "MEMBER", isActive: true },
+    ];
+    for (const qs of ["", "?includeFormer=false"]) {
+      const res = await list(stays, h.id, qs);
+      expect(res.status).toBe(200);
+      expect(res.body).toStrictEqual(expected);
+    }
+  });
+
+  it("includeFormer=true adds people who left and people who were removed, isActive false, ordered by joinedAt", async () => {
+    const { owner, stays, leaver, removed, h } = await household();
+    const res = await list(stays, h.id, "?includeFormer=true");
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual([
+      { userId: owner.id, name: "Olga", role: "OWNER", isActive: true },
+      { userId: stays.id, name: "Sam", role: "MEMBER", isActive: true },
+      { userId: leaver.id, name: "Lea", role: "MEMBER", isActive: false },
+      { userId: removed.id, name: "Rob", role: "MEMBER", isActive: false },
+    ]);
+    expectNoSensitiveFields(res.body);
+    expect(JSON.stringify(res.body)).not.toContain("@example.com");
+  });
+
+  it("a member who left and rejoined appears once, active", async () => {
+    const { owner, leaver, h } = await household();
+    const { token } = (await as(owner).post(`/households/${h.id}/invites`)).body;
+    expect((await as(leaver).post("/households/join").send({ token })).status).toBe(200);
+    const res = await list(owner, h.id, "?includeFormer=true");
+    const rows = res.body.filter((m: any) => m.userId === leaver.id);
+    expect(rows).toStrictEqual([{ userId: leaver.id, name: "Lea", role: "MEMBER", isActive: true }]);
+  });
+
+  it("does not include members of other households", async () => {
+    const { owner, h } = await household();
+    const other = await createUser();
+    const h2 = await createHousehold("Other", other);
+    const gone = await createUser();
+    await addMember(h2.id, gone.id, "MEMBER", { leftAt: new Date() });
+    const ids = (await list(owner, h.id, "?includeFormer=true")).body.map((m: any) => m.userId);
+    expect(ids).not.toContain(other.id);
+    expect(ids).not.toContain(gone.id);
+  });
+
+  for (const qs of ["includeFormer=TRUE", "includeFormer=1", "includeFormer=", "includeFormer=yes",
+    "includeFormer=true&includeFormer=true", "includeFormer=true&includeFormer=false"]) {
+    it(`returns 400 for ?${qs}`, async () => {
+      const { owner, h } = await household();
+      const res = await list(owner, h.id, `?${qs}`);
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({ error: "includeFormer must be true or false" });
+    });
+  }
+
+  it("a non-member and a former member (left or removed) get 404, with or without includeFormer", async () => {
+    const { leaver, removed, h } = await household();
+    const outsider = await createUser();
+    for (const u of [outsider, leaver, removed]) {
+      expect((await list(u, h.id)).status).toBe(404);
+      expect((await list(u, h.id, "?includeFormer=true")).status).toBe(404);
     }
   });
 });

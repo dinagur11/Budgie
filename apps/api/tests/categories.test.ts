@@ -31,7 +31,7 @@ async function custom(householdId: number, name: string, isArchived = false) {
 
 async function addExpense(householdId: number, userId: number, categoryId: number) {
   return prisma.expense.create({
-    data: { amount: 100, currency: "USD", date: new Date("2026-03-01"), categoryId, paidById: userId, createdById: userId, householdId },
+    data: { name: "Vet", amount: 100, currency: "USD", date: new Date("2026-03-01"), categoryId, paidById: userId, createdById: userId, householdId },
   });
 }
 

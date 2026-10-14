@@ -54,6 +54,7 @@ export async function addHouseholdData(householdId: number, userId: number) {
   });
   await prisma.expense.create({
     data: {
+      name: "Rent",
       amount: 1234,
       currency: "USD",
       date: new Date("2026-02-01"),
@@ -66,6 +67,7 @@ export async function addHouseholdData(householdId: number, userId: number) {
   });
   await prisma.expense.create({
     data: {
+      name: "Snacks",
       amount: 500,
       currency: "USD",
       date: new Date("2026-02-02"),

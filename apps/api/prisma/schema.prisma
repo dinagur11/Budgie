@@ -115,6 +115,7 @@ model Category{
 
 model Expense{
     id Int @id @default(autoincrement())
+    name String 
     amount Int
     currency Currency 
     date DateTime @db.Date

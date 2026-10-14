@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { HttpError } from "../middleware/errorHandler.js";
 import { requireMember, requireOwner } from "../middleware/household.js";
-import { validName, validCurrency, validTimeZone, validId, optional, validBoolean } from "../lib/validate.js";
+import { validName, validCurrency, validTimeZone, validId, optional, validBoolean, validAmount, validDate, validDescription} from "../lib/validate.js";
 import { createHousehold, updateHousehold, leaveHousehold, removeMember, deleteHousehold, getMembers, getHouseholdData} from "../services/householdsService.js"
 import { createInvite, previewInvite, acceptInvite, listInvites, cancelInvite } from "../services/invitesService.js";
 import { createCategory, deleteCategory, updateCategory, getAllCategories } from "../services/categoriesService.js"
+import { createExpense, listExpenses, getExpense, updateExpense, deleteExpense } from "../services/expensesService.js";
+import { decodeExpenseCursor } from "../lib/cursor.js";
 
 export const householdsRouter = Router();
 
@@ -46,10 +48,13 @@ householdsRouter.patch("/:id", requireMember, requireOwner, async (req, res) => 
     return res.status(200).json({ ...household, role: "OWNER" });
 })
 
-//get all members
+//get all members (?includeFormer=true to include members who left or were removed)
 householdsRouter.get("/:id/members", requireMember, async (req, res) => {
     const householdId:number = req.membership!.householdId;
-    const members = await getMembers(householdId);
+    const raw = req.query.includeFormer;
+    if (raw !== undefined && raw !== "true" && raw !== "false")
+        throw new HttpError(400, "includeFormer must be true or false");
+    const members = await getMembers(householdId, raw === "true");
     return res.status(200).json(members);
 })
 
@@ -144,7 +149,7 @@ householdsRouter.delete("/:id/categories/:categoryId", requireMember, requireOwn
     return res.status(204).end();  
 })
 
-//archive or unarchive category
+//archive or unarchive category, or change name 
 householdsRouter.patch("/:id/categories/:categoryId", requireMember, async (req, res) => {
     const householdId:number = req.membership!.householdId;
     const categoryId = req.params.categoryId;
@@ -170,4 +175,91 @@ householdsRouter.get("/:id/categories", requireMember, async (req, res) => {
     const includeArchived = raw === "true";
     const categories = await getAllCategories(householdId, includeArchived);
     return res.status(200).json(categories);
+})
+
+/* expenses */
+//create an expense 
+householdsRouter.post("/:id/expenses", requireMember, async (req, res) => {
+    const userId = req.user!.id;
+    const householdId = req.membership!.householdId;
+    const { name, amount, currency, date, categoryId, paidById, description } = req.body ?? {};
+    const validatedName = validName(name);
+    const validatedAmount = validAmount(amount);
+    const validatedCurrency = optional(currency, validCurrency);
+    const validatedDate = validDate(date);
+    const validatedCategoryId = validId(categoryId);
+    const validatedPaidById = validId(paidById);
+    const validatedDescription = optional(description, validDescription);
+    const expense = await createExpense(householdId, validatedName, validatedAmount, validatedCurrency, validatedDate, validatedCategoryId, validatedPaidById,
+        validatedDescription, userId);
+    return res.status(201).json(expense);
+})
+
+//a query parameter given at most once (a repeated one arrives as an array)
+function singleQuery(value: unknown, name: string): string | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value !== "string")
+        throw new HttpError(400, `${name} must not be repeated`);
+    return value;
+}
+
+function validLimit(value: string): number {
+    if (!/^[1-9]\d*$/.test(value) || Number(value) > 100)
+        throw new HttpError(400, "limit must be an integer from 1 to 100");
+    return Number(value);
+}
+
+//list expenses, newest first (?from, ?to, ?categoryId, ?paidById, ?limit, ?cursor)
+householdsRouter.get("/:id/expenses", requireMember, async (req, res) => {
+    const householdId = req.membership!.householdId;
+    const q = req.query;
+    const from = optional(singleQuery(q.from, "from"), validDate);
+    const to = optional(singleQuery(q.to, "to"), validDate);
+    if (from !== undefined && to !== undefined && from > to)
+        throw new HttpError(400, "from must not be after to");
+    const categoryId = optional(singleQuery(q.categoryId, "categoryId"), validId);
+    const paidById = optional(singleQuery(q.paidById, "paidById"), validId);
+    const limit = optional(singleQuery(q.limit, "limit"), (v) => validLimit(v as string)) ?? 50;
+    // the cursor must have been issued for these same filters
+    const cursor = optional(singleQuery(q.cursor, "cursor"), (v) => decodeExpenseCursor(v as string, { householdId, from, to, categoryId, paidById }));
+    const page = await listExpenses(householdId, { from, to, categoryId, paidById, limit, cursor });
+    return res.status(200).json(page);
+})
+
+//get one expense
+householdsRouter.get("/:id/expenses/:expenseId", requireMember, async (req, res) => {
+    const householdId = req.membership!.householdId;
+    const expenseId = validId(req.params.expenseId);
+    const expense = await getExpense(expenseId, householdId);
+    return res.status(200).json(expense);
+})
+
+//update an expense (payer, creator or owner)
+householdsRouter.patch("/:id/expenses/:expenseId", requireMember, async (req, res) => {
+    const { householdId, role } = req.membership!;
+    const expenseId = validId(req.params.expenseId);
+    const { name, amount, currency, date, categoryId, paidById, description } = req.body ?? {};
+    const data = {
+        name: optional(name, validName),
+        amount: optional(amount, validAmount),
+        currency: optional(currency, validCurrency),
+        date: optional(date, validDate),
+        categoryId: optional(categoryId, validId),
+        paidById: optional(paidById, validId),
+        // a string sets the description; null or an empty string clears it
+        description: description === null ? null : optional(description, (v) => validDescription(v) ?? null),
+    };
+    if (Object.values(data).every((v) => v === undefined)) {
+        throw new HttpError(400, "Nothing to update");
+    }
+    const expense = await updateExpense(expenseId, householdId, req.user!.id, role, data);
+    return res.status(200).json(expense);
+})
+
+//delete an expense (payer, creator or owner)
+householdsRouter.delete("/:id/expenses/:expenseId", requireMember, async (req, res) => {
+    const { householdId, role } = req.membership!;
+    const expenseId = validId(req.params.expenseId);
+    await deleteExpense(expenseId, householdId, req.user!.id, role);
+    return res.status(204).end();
 })

@@ -2,6 +2,9 @@ import { HttpError } from "../middleware/errorHandler.js";
 import { Currency } from "../../generated/prisma/client.js";
 
 const MAX_INT = 2147483647;
+const MAX_DESCRIPTION_LENGTH = 500;
+const MIN_YEAR = 2000;
+const MAX_YEAR = 2100;
 
 export function optional<T>(value: unknown, validate: (v: unknown) => T): T | undefined {
   return value === undefined ? undefined : validate(value);
@@ -47,4 +50,51 @@ export function validBoolean(value: unknown, field?: string): boolean {
   if (typeof value !== "boolean")
     throw new HttpError(400, field ? `${field} must be true or false` : "Invalid boolean value");
   return value;
+}
+
+export function validAmount(value: unknown): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > MAX_INT
+  ) {
+    throw new HttpError(400, "Amount must be a positive whole number");
+  }
+  return value;
+}
+
+export function validDate(value: unknown): Date {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new HttpError(400, "Date must be in YYYY-MM-DD format");
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  // Date rolls invalid days over (2026-02-30 becomes March 2), so compare the parts back
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day ||
+    year < MIN_YEAR ||
+    year > MAX_YEAR
+  ) {
+    throw new HttpError(400, "Date is not a valid calendar date");
+  }
+  return date;
+}
+
+export function validDescription(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    throw new HttpError(400, "Description must be a string");
+  }
+  const trimmed = value.trim();
+  if (trimmed.length > MAX_DESCRIPTION_LENGTH) {
+    throw new HttpError(
+      400,
+      `Description must be at most ${MAX_DESCRIPTION_LENGTH} characters`
+    );
+  }
+  return trimmed === "" ? undefined : trimmed;
 }
