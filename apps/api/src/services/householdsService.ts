@@ -34,7 +34,7 @@ export async function updateHousehold(householdId: number, dataToUpdate: Househo
 export async function getMembers(householdId: number, includeFormer = false) {
     const members = await prisma.householdMember.findMany({
         where: { householdId, ...(includeFormer ? {} : { leftAt: null }) },
-        select: { userId: true, role: true, leftAt: true, user: { select: { name: true } }, },
+        select: { userId: true, role: true, joinedAt: true, leftAt: true, user: { select: { name: true } }, },
         orderBy: { joinedAt: "asc" },
     });
 
@@ -42,6 +42,7 @@ export async function getMembers(householdId: number, includeFormer = false) {
         userId: m.userId,
         name: m.user.name,
         role: m.role,
+        joinedAt: m.joinedAt.toISOString(),
         isActive: m.leftAt === null,
     }));
 }

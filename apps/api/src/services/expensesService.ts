@@ -2,6 +2,7 @@ import { Currency, Prisma, Role } from "../../generated/prisma/client.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { prisma } from "../prisma.js";
 import { encodeExpenseCursor, type ExpenseCursor } from "../lib/cursor.js";
+import { generateDueExpenses } from "./recurringRulesService.js";
 
 export type ExpenseUpdate = {
   name?: string;
@@ -71,20 +72,19 @@ export async function assertUsableCategory(categoryId: number, householdId: numb
 }
 
 export async function createExpense(
-    householdId: number, name: string, amount: number, currency: Currency | undefined, date: Date,
+    householdId: number, name: string, amount: number, currency: Currency, date: Date,
     categoryId: number, paidById: number, description: string | undefined, createdById: number){
         await assertUsableCategory(categoryId, householdId);
         await assertActivePayer(paidById, householdId);
 
         const household = await prisma.household.findUnique({
             where: {id: householdId},
-            select: { defaultCurrency: true, timeZone: true }
+            select: { timeZone: true }
         })
         assertNotFutureDate(date, household!.timeZone);
-        const currencyOrDef = currency === undefined? household!.defaultCurrency : currency;
         try{
             const expense = await prisma.expense.create({
-                data: { householdId, name, amount, currency: currencyOrDef, date, categoryId, paidById, description, createdById},
+                data: { householdId, name, amount, currency, date, categoryId, paidById, description, createdById},
                 select: expenseSelect
             })
             return toExpenseResponse(expense);
@@ -97,8 +97,9 @@ export async function createExpense(
 
 
 // newest first (date, then id), keyset pagination on (date, id);
-// totalCount ignores the cursor, so it is the same on every page
+// totalCount ignores the cursor, so it is the same on every page; due recurring expenses are created first
 export async function listExpenses(householdId: number, filters: ExpenseFilters) {
+  await generateDueExpenses(householdId);
   const { from, to, categoryId, paidById, limit, cursor } = filters;
   const where: Prisma.ExpenseWhereInput = {
     householdId,
@@ -153,9 +154,10 @@ export async function updateExpense(expenseId: number, householdId: number, user
   const expense = await expenseToChange(expenseId, householdId, userId, role);
 
   if (expense.recurringRuleId !== null) {
-    const { name, currency, date, categoryId } = dataToUpdate;
-    if ([name, currency, date, categoryId].some((v) => v !== undefined))
-      throw new HttpError(409, "Only amount, payer and description can be changed on a recurring expense");
+    // the rule owns everything else; changing it on the rule changes all its expenses
+    const { name, amount, currency, date, categoryId, paidById } = dataToUpdate;
+    if ([name, amount, currency, date, categoryId, paidById].some((v) => v !== undefined))
+      throw new HttpError(409, "Only the description can be changed on a recurring expense");
   }
 
   // same order as createExpense: category first, then payer

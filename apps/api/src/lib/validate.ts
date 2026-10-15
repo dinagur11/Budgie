@@ -1,5 +1,5 @@
 import { HttpError } from "../middleware/errorHandler.js";
-import { Currency } from "../../generated/prisma/client.js";
+import { Currency, Frequency } from "../../generated/prisma/client.js";
 
 const MAX_INT = 2147483647;
 const MAX_DESCRIPTION_LENGTH = 500;
@@ -24,6 +24,16 @@ export function validCurrency(value: unknown): Currency {
     throw new HttpError(400, "Invalid currency");
   }
   return value as Currency;
+}
+
+export function validFrequency(value: unknown): Frequency {
+  if (
+    typeof value !== "string" ||
+    !Object.values(Frequency).includes(value as Frequency)
+  ) {
+    throw new HttpError(400, "Invalid frequency");
+  }
+  return value as Frequency;
 }
 
 export function validTimeZone(value: unknown): string {
@@ -83,6 +93,16 @@ export function validDate(value: unknown): Date {
     throw new HttpError(400, "Date is not a valid calendar date");
   }
   return date;
+}
+
+// strict YYYY-MM (month 01 to 12, years 2000 to 2100); returns the month's first and last day at UTC midnight
+export function validMonth(value: unknown): { first: Date; last: Date } {
+  const match = typeof value === "string" ? /^(\d{4})-(\d{2})$/.exec(value) : null;
+  const year = match ? Number(match[1]) : NaN;
+  const month = match ? Number(match[2]) : NaN;
+  if (!(year >= MIN_YEAR && year <= MAX_YEAR && month >= 1 && month <= 12))
+    throw new HttpError(400, "Invalid month");
+  return { first: new Date(Date.UTC(year, month - 1, 1)), last: new Date(Date.UTC(year, month, 0)) };
 }
 
 export function validDescription(value: unknown): string | undefined {

@@ -44,7 +44,6 @@ export async function addHouseholdData(householdId: number, userId: number) {
       amount: 100000,
       currency: "USD",
       frequency: "MONTHLY",
-      dayOfMonth: 1,
       startDate: new Date("2026-01-01"),
       householdId,
       paidById: userId,
@@ -111,9 +110,11 @@ export const anon = () => request(app);
 export const INVALID_IDS = ["abc", "0", "-1", "007", "0001", "1.5", "1e3", "0x10", " 5 ", "99999999999999999999", "2147483648"];
 export const MAX_ID = 2147483647;
 
-export function expectNoSensitiveFields(body: unknown) {
+// `allow` names fields a route returns on purpose (the members list returns joinedAt, for the app's "Joined" date)
+export function expectNoSensitiveFields(body: unknown, allow: string[] = []) {
   const json = JSON.stringify(body);
-  if (/"email"|"cognitoId"|"leftAt"|"joinedAt"|"createdAt"/.test(json)) {
+  const fields = ["email", "cognitoId", "leftAt", "joinedAt", "createdAt"].filter((f) => !allow.includes(f));
+  if (new RegExp(fields.map((f) => `"${f}"`).join("|")).test(json)) {
     throw new Error(`Response contains a sensitive or internal field: ${json}`);
   }
 }

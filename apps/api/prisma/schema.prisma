@@ -147,7 +147,6 @@ model RecurringRule{
     amount Int
     currency Currency
     frequency Frequency
-    dayOfMonth Int? //for monthly rules
     startDate DateTime @db.Date
     endDate DateTime? @db.Date
     nextOccurrence DateTime? @db.Date // null once the rule has no more occurrences

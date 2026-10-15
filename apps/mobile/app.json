@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Budgie",
+    "slug": "budgie",
+    "version": "1.0.0",
+    "scheme": "budgie",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.budgie.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#f7f9ff",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 120,
+          "backgroundColor": "#f7f9ff"
+        }
+      ],
+      "expo-font",
+      "expo-status-bar",
+      ["expo-build-properties", { "ios": { "enableSceneSupport": true } }]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "bundleIdentifier": "com.budgie.mobile"
+    }
+  }
+}

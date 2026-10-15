@@ -187,11 +187,11 @@ describe("GET /households/:id/members", () => {
     const res = await as(a).get(`/households/${h.id}/members`);
     expect(res.status).toBe(200);
     expect(res.body).toStrictEqual([
-      { userId: owner.id, name: "Olga", role: "OWNER", isActive: true },
-      { userId: a.id, name: "Avi", role: "MEMBER", isActive: true },
-      { userId: b.id, name: "Bea", role: "MEMBER", isActive: true },
+      { userId: owner.id, name: "Olga", role: "OWNER", joinedAt: expect.any(String), isActive: true },
+      { userId: a.id, name: "Avi", role: "MEMBER", joinedAt: expect.any(String), isActive: true },
+      { userId: b.id, name: "Bea", role: "MEMBER", joinedAt: expect.any(String), isActive: true },
     ]);
-    expectNoSensitiveFields(res.body);
+    expectNoSensitiveFields(res.body, ["joinedAt"]);
     expect(JSON.stringify(res.body)).not.toContain("@example.com");
   });
 

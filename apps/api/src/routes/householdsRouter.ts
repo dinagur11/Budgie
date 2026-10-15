@@ -1,16 +1,19 @@
 import { Router } from "express";
 import { HttpError } from "../middleware/errorHandler.js";
 import { requireMember, requireOwner } from "../middleware/household.js";
-import { validName, validCurrency, validTimeZone, validId, optional, validBoolean, validAmount, validDate, validDescription} from "../lib/validate.js";
+import { validName, validCurrency, validTimeZone, validId, optional, validBoolean, validAmount, validDate, validDescription, validFrequency, validMonth } from "../lib/validate.js";
 import { createHousehold, updateHousehold, leaveHousehold, removeMember, deleteHousehold, getMembers, getHouseholdData} from "../services/householdsService.js"
 import { createInvite, previewInvite, acceptInvite, listInvites, cancelInvite } from "../services/invitesService.js";
 import { createCategory, deleteCategory, updateCategory, getAllCategories } from "../services/categoriesService.js"
 import { createExpense, listExpenses, getExpense, updateExpense, deleteExpense } from "../services/expensesService.js";
 import { decodeExpenseCursor } from "../lib/cursor.js";
+import { createRule, listRules, getRule, updateRule, deleteRule } from "../services/recurringRulesService.js";
+import { getCalendar } from "../services/calendarService.js";
+import { getSummary } from "../services/summaryService.js";
 
 export const householdsRouter = Router();
 
-//create an household
+//create an household: all fields mandatory
 householdsRouter.post("/", async (req, res) => {
     const userId = req.user!.id;
     const { name, defaultCurrency, timeZone } = req.body ?? {};
@@ -185,7 +188,7 @@ householdsRouter.post("/:id/expenses", requireMember, async (req, res) => {
     const { name, amount, currency, date, categoryId, paidById, description } = req.body ?? {};
     const validatedName = validName(name);
     const validatedAmount = validAmount(amount);
-    const validatedCurrency = optional(currency, validCurrency);
+    const validatedCurrency = validCurrency(currency);
     const validatedDate = validDate(date);
     const validatedCategoryId = validId(categoryId);
     const validatedPaidById = validId(paidById);
@@ -262,4 +265,99 @@ householdsRouter.delete("/:id/expenses/:expenseId", requireMember, async (req, r
     const expenseId = validId(req.params.expenseId);
     await deleteExpense(expenseId, householdId, req.user!.id, role);
     return res.status(204).end();
+})
+
+/* recurring rules */
+//create recurring rule. only end-date optional
+householdsRouter.post("/:id/rules", requireMember, async (req, res) => {
+    const createdById = req.user!.id;
+    const householdId = req.membership!.householdId;
+    const { name, startDate, endDate, amount, currency, paidById, categoryId, frequency } = req.body ?? {};
+    const validatedName = validName(name);
+    const validatedStart = validDate(startDate);
+    const validatedEnd = optional(endDate, validDate);
+    const validatedAmount = validAmount(amount);
+    const validatedCurrency = validCurrency(currency);
+    const validatedPaidById = validId(paidById);
+    const validatedCategoryId = validId(categoryId);
+    const validatedFreq = validFrequency(frequency);
+
+    if (validatedEnd && validatedEnd < validatedStart)
+        throw new HttpError(400, "End date must be on or after start date");
+
+    const rule = await createRule(createdById, householdId, validatedName, validatedStart, validatedEnd, validatedAmount, validatedCurrency, 
+        validatedPaidById, validatedCategoryId, validatedFreq,);
+    return res.status(201).json(rule);
+})
+
+//list rules, newest first (?activeOnly=true for rules that still have occurrences)
+householdsRouter.get("/:id/rules", requireMember, async (req, res) => {
+    const householdId = req.membership!.householdId;
+    const raw = req.query.activeOnly;
+    if (raw !== undefined && raw !== "true" && raw !== "false")
+        throw new HttpError(400, "activeOnly must be true or false");
+    const rules = await listRules(householdId, raw === "true");
+    return res.status(200).json(rules);
+})
+
+//get one rule
+householdsRouter.get("/:id/rules/:ruleId", requireMember, async (req, res) => {
+    const householdId = req.membership!.householdId;
+    const ruleId = validId(req.params.ruleId);
+    const rule = await getRule(ruleId, householdId);
+    return res.status(200).json(rule);
+})
+
+//update a rule (payer, creator or owner; changing the payer: creator or owner)
+householdsRouter.patch("/:id/rules/:ruleId", requireMember, async (req, res) => {
+    const { householdId, role } = req.membership!;
+    const ruleId = validId(req.params.ruleId);
+    const { name, amount, currency, frequency, startDate, endDate, paidById, categoryId } = req.body ?? {};
+    const data = {
+        name: optional(name, validName),
+        amount: optional(amount, validAmount),
+        currency: optional(currency, validCurrency),
+        frequency: optional(frequency, validFrequency),
+        startDate: optional(startDate, validDate),
+        // null clears the end date
+        endDate: endDate === null ? null : optional(endDate, validDate),
+        paidById: optional(paidById, validId),
+        categoryId: optional(categoryId, validId),
+    };
+    if (Object.values(data).every((v) => v === undefined)) {
+        throw new HttpError(400, "Nothing to update");
+    }
+    const rule = await updateRule(ruleId, householdId, req.user!.id, role, data);
+    return res.status(200).json(rule);
+})
+
+//delete a rule (payer, creator or owner); ?deleteExpenses=true also deletes its expenses
+householdsRouter.delete("/:id/rules/:ruleId", requireMember, async (req, res) => {
+    const { householdId, role } = req.membership!;
+    const ruleId = validId(req.params.ruleId);
+    const raw = req.query.deleteExpenses;
+    if (raw !== undefined && raw !== "true" && raw !== "false")
+        throw new HttpError(400, "deleteExpenses must be true or false");
+    await deleteRule(ruleId, householdId, req.user!.id, role, raw === "true");
+    return res.status(204).end();
+})
+
+/* calendar */
+//a month's real expenses plus the projected future occurrences of active rules (?month=YYYY-MM, required)
+householdsRouter.get("/:id/calendar", requireMember, async (req, res) => {
+    const householdId = req.membership!.householdId;
+    // a repeated parameter arrives as an array and is rejected by validMonth
+    const { first, last } = validMonth(req.query.month);
+    const calendar = await getCalendar(householdId, first, last);
+    return res.status(200).json(calendar);
+})
+
+/* summary */
+//a month's totals per currency: spent (real expenses) and projected (the calendar's projections) (?month=YYYY-MM, required)
+householdsRouter.get("/:id/summary", requireMember, async (req, res) => {
+    const householdId = req.membership!.householdId;
+    // a repeated parameter arrives as an array and is rejected by validMonth
+    const { first, last } = validMonth(req.query.month);
+    const summary = await getSummary(householdId, first, last);
+    return res.status(200).json(summary);
 })

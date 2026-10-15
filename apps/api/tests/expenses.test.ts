@@ -3,7 +3,7 @@ import { prisma, as, anon, createUser, createHousehold, addMember, INVALID_IDS, 
 
 const SHAPE_KEYS = ["amount", "categoryId", "createdById", "currency", "date", "description", "id", "isRecurring", "name", "paidById"];
 const FORBIDDEN = { error: "Only the payer, the creator or an owner can change this expense" };
-const RECURRING_FIELDS = { error: "Only amount, payer and description can be changed on a recurring expense" };
+const RECURRING_FIELDS = { error: "Only the description can be changed on a recurring expense" };
 const FUTURE = { error: "Date can't be in the future" };
 
 // fake only Date, so supertest and the database driver keep their real timers
@@ -55,7 +55,7 @@ async function addExpense(d: ExpenseData) {
 async function addRecurringExpense(householdId: number, userId: number, categoryId: number) {
   const rule = await prisma.recurringRule.create({
     data: {
-      name: "Rent", amount: 100000, currency: "USD", frequency: "MONTHLY", dayOfMonth: 1, startDate: new Date("2026-01-01"),
+      name: "Rent", amount: 100000, currency: "USD", frequency: "MONTHLY", startDate: new Date("2026-01-01"),
       householdId, paidById: userId, createdById: userId, categoryId,
     },
   });
@@ -69,7 +69,7 @@ function expectShape(body: any) {
 
 describe("POST /households/:id/expenses", () => {
   const body = (categoryId: number, paidById: number, extra: object = {}) =>
-    ({ name: "Groceries run", amount: 4599, date: "2026-03-05", categoryId, paidById, ...extra });
+    ({ name: "Groceries run", amount: 4599, currency: "USD", date: "2026-03-05", categoryId, paidById, ...extra });
 
   it("creates the expense: 201 with the shared shape; createdById is the caller", async () => {
     const { owner, member, h, food } = await setup();
@@ -83,12 +83,15 @@ describe("POST /households/:id/expenses", () => {
     expect(row).toMatchObject({ householdId: h.id, createdById: member.id, recurringRuleId: null });
   });
 
-  it("currency defaults to the household's defaultCurrency", async () => {
+  it("currency is required: missing, null or unknown is 400 'Invalid currency', with no fallback to defaultCurrency", async () => {
     const { owner, h, food } = await setup();
     await prisma.household.update({ where: { id: h.id }, data: { defaultCurrency: "ILS" } });
-    const res = await as(owner).post(base(h.id)).send(body(food.id, owner.id));
-    expect(res.status).toBe(201);
-    expect(res.body.currency).toBe("ILS");
+    for (const currency of [undefined, null, "", "XXX", "usd", 1]) {
+      const res = await as(owner).post(base(h.id)).send(body(food.id, owner.id, { currency }));
+      expect(res.status, String(currency)).toBe(400);
+      expect(res.body).toStrictEqual({ error: "Invalid currency" });
+    }
+    expect(await prisma.expense.count({ where: { householdId: h.id } })).toBe(0);
   });
 
   it("an empty description is stored as none", async () => {
@@ -163,7 +166,7 @@ describe("POST /households/:id/expenses", () => {
 
 describe("POST /households/:id/expenses: no future dates", () => {
   const post = (u: { id: number }, householdId: number, categoryId: number, date: string) =>
-    as(u).post(base(householdId)).send({ name: "Coffee", amount: 450, date, categoryId, paidById: u.id });
+    as(u).post(base(householdId)).send({ name: "Coffee", amount: 450, currency: "USD", date, categoryId, paidById: u.id });
 
   it("today in the household's zone is accepted", async () => {
     setNow("2026-10-14T12:00:00Z");
@@ -641,25 +644,26 @@ describe("recurring expenses", () => {
     expect(await prisma.expense.count({ where: { id: expense.id } })).toBe(1);
   });
 
-  it("amount, payer and description can be changed", async () => {
-    const { owner, member, h, food } = await setup();
+  it("the description can be changed and cleared", async () => {
+    const { owner, h, food } = await setup();
     const { expense } = await addRecurringExpense(h.id, owner.id, food.id);
-    const res = await as(owner).patch(`${base(h.id)}/${expense.id}`).send({ amount: 99000, paidById: member.id, description: "discounted" });
+    const res = await as(owner).patch(`${base(h.id)}/${expense.id}`).send({ description: "discounted" });
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ amount: 99000, paidById: member.id, description: "discounted", isRecurring: true });
+    expect(res.body).toMatchObject({ amount: 100000, paidById: owner.id, description: "discounted", isRecurring: true });
+    expect((await as(owner).patch(`${base(h.id)}/${expense.id}`).send({ description: null })).body.description).toBeNull();
   });
 
-  for (const [field, value] of [["name", "Other rent"], ["currency", "EUR"], ["date", "2026-02-02"], ["categoryId", "FUN"]] as const) {
+  for (const [field, value] of [["name", "Other rent"], ["amount", 99000], ["currency", "EUR"], ["date", "2026-02-02"], ["categoryId", "FUN"], ["paidById", "MEMBER"]] as const) {
     it(`changing ${field} is 409, alone or with allowed fields, nothing changes`, async () => {
-      const { owner, h, food, fun } = await setup();
+      const { owner, member, h, food, fun } = await setup();
       const { expense } = await addRecurringExpense(h.id, owner.id, food.id);
-      const v = value === "FUN" ? fun.id : value;
-      for (const body of [{ [field]: v }, { amount: 1, [field]: v }]) {
+      const v = value === "FUN" ? fun.id : value === "MEMBER" ? member.id : value;
+      for (const body of [{ [field]: v }, { description: "x", [field]: v }]) {
         const res = await as(owner).patch(`${base(h.id)}/${expense.id}`).send(body);
         expect(res.status).toBe(409);
         expect(res.body).toStrictEqual(RECURRING_FIELDS);
       }
-      expect(await prisma.expense.findUnique({ where: { id: expense.id } })).toMatchObject({ name: "Rent", amount: 100000, currency: "USD", categoryId: food.id });
+      expect(await prisma.expense.findUnique({ where: { id: expense.id } })).toMatchObject({ name: "Rent", amount: 100000, currency: "USD", categoryId: food.id, paidById: owner.id, description: null });
     });
   }
 
@@ -853,7 +857,7 @@ describe("expenses: shared payer and category checks", () => {
     const { owner, member, third, h, food, old, foreign, otherOwner } = await setup();
     await prisma.householdMember.update({ where: { userId_householdId: { userId: third.id, householdId: h.id } }, data: { leftAt: new Date() } });
     const e = await addExpense({ householdId: h.id, categoryId: food.id, paidById: member.id, createdById: owner.id });
-    const post = (extra: object) => as(owner).post(base(h.id)).send({ name: "X", amount: 1, date: "2026-03-01", categoryId: food.id, paidById: owner.id, ...extra });
+    const post = (extra: object) => as(owner).post(base(h.id)).send({ name: "X", amount: 1, currency: "USD", date: "2026-03-01", categoryId: food.id, paidById: owner.id, ...extra });
     const patch = (body: object) => as(owner).patch(`${base(h.id)}/${e.id}`).send(body);
 
     for (const paidById of [third.id, otherOwner.id, MAX_ID]) {
@@ -880,7 +884,7 @@ describe("expenses: shared payer and category checks", () => {
     const { owner, third, h, food, old } = await setup();
     await prisma.householdMember.update({ where: { userId_householdId: { userId: third.id, householdId: h.id } }, data: { leftAt: new Date() } });
     const e = await addExpense({ householdId: h.id, categoryId: food.id, paidById: owner.id });
-    const a = await as(owner).post(base(h.id)).send({ name: "X", amount: 1, date: "2026-03-01", categoryId: old.id, paidById: third.id });
+    const a = await as(owner).post(base(h.id)).send({ name: "X", amount: 1, currency: "USD", date: "2026-03-01", categoryId: old.id, paidById: third.id });
     const b = await as(owner).patch(`${base(h.id)}/${e.id}`).send({ categoryId: old.id, paidById: third.id });
     expect(a.body).toStrictEqual({ error: "Invalid category" });
     expect(b.body).toStrictEqual(a.body);

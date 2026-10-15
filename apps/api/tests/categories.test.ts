@@ -38,7 +38,7 @@ async function addExpense(householdId: number, userId: number, categoryId: numbe
 async function addRule(householdId: number, userId: number, categoryId: number) {
   return prisma.recurringRule.create({
     data: {
-      name: "Gym", amount: 5000, currency: "USD", frequency: "MONTHLY", dayOfMonth: 1, startDate: new Date("2026-01-01"),
+      name: "Gym", amount: 5000, currency: "USD", frequency: "MONTHLY", startDate: new Date("2026-01-01"),
       householdId, paidById: userId, createdById: userId, categoryId,
     },
   });
