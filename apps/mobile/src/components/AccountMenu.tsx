@@ -7,7 +7,7 @@ import { useSession } from "../auth/session";
 import { colors, MIN_TOUCH, radii, shadows, type as t } from "../theme";
 import { Icon, type IconName } from "./Icon";
 
-// The account icon in the header and its drop-down: who is signed in (tap for the account settings), and log out.
+// The account icon in the header and its drop-down: who is signed in (tap for the profile), and log out.
 export function AccountMenu() {
   const [open, setOpen] = useState(false);
   const insets = useSafeAreaInsets();
@@ -40,11 +40,11 @@ export function AccountMenu() {
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} accessibilityLabel="Close account menu" />
         {/* right under the header (56dp row below the status bar) */}
         <View style={[styles.menu, { top: insets.top + 52 }]}>
-          {/* the name opens the account settings (change name, change password, log out) */}
+          {/* the name opens the profile (what the user paid across households) */}
           <Pressable
-            onPress={() => { setOpen(false); router.push("/account-settings"); }}
+            onPress={() => { setOpen(false); router.push("/profile"); }}
             accessibilityRole="button"
-            accessibilityLabel="Account settings"
+            accessibilityLabel="Your profile"
             style={({ pressed }) => [styles.who, pressed && { backgroundColor: colors.surfaceContainerLow }]}
           >
             <View style={styles.whoText}>

@@ -1,4 +1,4 @@
-import { AppHeader } from "../../src/components/AppHeader";
+import { AppHeader, useBackToHouseholds } from "../../src/components/AppHeader";
 import { Card } from "../../src/components/Card";
 import { HouseholdSwitcher } from "../../src/components/HouseholdSwitcher";
 import { Placeholder } from "../../src/components/Placeholder";
@@ -14,11 +14,12 @@ import { monthOf, todayInTimeZone } from "../../src/lib/dates";
 // The selected household's analytics: one month's spending by category or payer (a donut), and the last months' totals
 // (bars). Both read existing endpoints (calendar and summary); months are the household's.
 export default function AnalyticsScreen() {
+  const back = useBackToHouseholds();
   const { selectedId } = useHouseholdSelection();
   const household = useHousehold(selectedId);
   const categories = useCategories(selectedId);
   const members = useMembers(selectedId);
-  const header = <AppHeader center={selectedId !== null ? <HouseholdSwitcher /> : undefined} />;
+  const header = <AppHeader onBack={back} center={selectedId !== null ? <HouseholdSwitcher /> : undefined} />;
 
   if (selectedId === null)
     return (

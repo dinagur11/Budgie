@@ -24,7 +24,7 @@ export function HouseholdCard({ household, onPress }: { household: MyHousehold; 
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${household.name}${amount && monthName ? `, spent in ${monthName} so far: ${amount}` : ""}`}
+      accessibilityLabel={`${household.name}${amount && monthName ? `, total spending of the entire household in ${monthName}: ${amount}` : ""}`}
       accessibilityHint="Opens the household"
       style={({ pressed }) => [styles.card, { backgroundColor: tint(color, pressed ? 0.14 : 0.07), borderColor: tint(color, 0.22) }]}
     >
@@ -37,7 +37,7 @@ export function HouseholdCard({ household, onPress }: { household: MyHousehold; 
         <Icon name="chevron-right" size={20} color={colors.outline} />
       </View>
       <View style={[styles.spent, { backgroundColor: tint(color, 0.17) }]}>
-        <Text style={styles.label}>{monthName ? `Spent in ${monthName} so far` : "Spent this month so far"}</Text>
+        <Text style={styles.label}>{monthName ? `Total spending of the entire household in ${monthName}` : "Total spending of the entire household this month"}</Text>
         {failed ? (
           <Text style={styles.error}>Couldn't load the totals. Pull down to try again.</Text>
         ) : amount ? (

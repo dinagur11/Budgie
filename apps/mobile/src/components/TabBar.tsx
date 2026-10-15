@@ -11,7 +11,7 @@ export type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>["ta
 const TABS: Record<string, { label: string; icon: IconName | { outline: OutlineIconName } }> = {
   "(home)": { label: "Expenses", icon: "payments" },
   members: { label: "Members", icon: "diversity-1" },
-  calendar: { label: "Calendar", icon: "calendar-today" },
+  // the Calendar tab is hidden for now (not built yet): a route missing here gets no button
   analytics: { label: "Analytics", icon: { outline: "chart-pie-outline" } },
   settings: { label: "Settings", icon: { outline: "cog-outline" } },
 };

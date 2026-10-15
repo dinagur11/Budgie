@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Alert, StyleSheet, Text } from "react-native";
 import { router } from "expo-router";
-import { AppHeader } from "../../src/components/AppHeader";
+import { AppHeader, useBackToHouseholds } from "../../src/components/AppHeader";
 import { Banner } from "../../src/components/Banner";
 import { Button } from "../../src/components/Button";
 import { Card } from "../../src/components/Card";
@@ -22,11 +22,12 @@ import { colors, type as t } from "../../src/theme";
 // Settings of the selected household: an owner edits its name, default currency and time zone, manages the
 // household's categories, or deletes it; a member can leave it. Log out is in the account menu (AppHeader).
 export default function SettingsScreen() {
+  const back = useBackToHouseholds();
   const { selectedId } = useHouseholdSelection();
   const household = useHousehold(selectedId);
 
   return (
-    <Screen inTabs header={<AppHeader center={selectedId !== null ? <HouseholdSwitcher /> : undefined} />}>
+    <Screen inTabs header={<AppHeader onBack={back} center={selectedId !== null ? <HouseholdSwitcher /> : undefined} />}>
       {selectedId === null ? (
         <Placeholder icon="settings" title="No household yet" text="Create a household to change its settings here." />
       ) : household.isError ? (

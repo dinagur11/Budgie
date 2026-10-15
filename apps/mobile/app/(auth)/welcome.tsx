@@ -12,6 +12,7 @@ const FEATURES: { icon: IconName; title: string; text: string }[] = [
   { icon: "diversity-1", title: "Share a household", text: "Everyone logs what they paid, and you all see the month's spending." },
   { icon: "update", title: "Recurring expenses", text: "Rent, bills and subscriptions are added for you on schedule." },
   { icon: "calendar-month", title: "See what's ahead", text: "A calendar of what's been paid and what's still to come." },
+  { icon: "pie-chart", title: "Analytics", text: "Charts of your spending by category, by payer and month by month." },
 ];
 
 export default function WelcomeScreen() {

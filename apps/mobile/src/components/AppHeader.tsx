@@ -1,10 +1,18 @@
-import type { ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "expo-router";
 import { colors, MIN_TOUCH, shadows } from "../theme";
 import { Icon } from "./Icon";
 import { Wordmark } from "./Wordmark";
 import { AccountMenu } from "./AccountMenu";
+
+// The household tabs' back arrow: switch to the Expenses tab and go back to its first screen, the households list.
+// `pop` makes the Expenses stack return to the list already in it (a plain navigate would push a second copy).
+export function useBackToHouseholds() {
+  const navigation = useNavigation<{ navigate: (name: string, params: object) => void }>();
+  return useCallback(() => navigation.navigate("(home)", { screen: "index", pop: true }), [navigation]);
+}
 
 // The shared top bar: logo (or a back button), an optional center element (the household switcher) and the account menu.
 // A solid surface with a faint shadow (the mock's blur is left out on purpose).

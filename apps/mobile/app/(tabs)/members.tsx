@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Alert, Pressable, Share, StyleSheet, Text, View } from "react-native";
-import { AppHeader } from "../../src/components/AppHeader";
+import { AppHeader, useBackToHouseholds } from "../../src/components/AppHeader";
 import { Banner } from "../../src/components/Banner";
 import { Button } from "../../src/components/Button";
 import { Card } from "../../src/components/Card";
@@ -21,11 +21,12 @@ import { colors, fonts, MIN_TOUCH, type as t } from "../../src/theme";
 // The selected household's active members (the caller included, marked "You"), when each joined and their role.
 // An owner can remove the others and create invite links.
 export default function MembersScreen() {
+  const back = useBackToHouseholds();
   const { selectedId } = useHouseholdSelection();
   const household = useHousehold(selectedId);
   const members = useMembers(selectedId);
   const me = useMe();
-  const header = <AppHeader center={<HouseholdSwitcher />} />;
+  const header = <AppHeader onBack={back} center={<HouseholdSwitcher />} />;
 
   if (selectedId === null)
     return (
