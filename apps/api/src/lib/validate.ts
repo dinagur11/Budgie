@@ -5,6 +5,8 @@ const MAX_INT = 2147483647;
 const MAX_DESCRIPTION_LENGTH = 500;
 const MIN_YEAR = 2000;
 const MAX_YEAR = 2100;
+// largest receipt image accepted, in bytes (the upload's size and the analyze step's check)
+export const MAX_RECEIPT_BYTES = 5_000_000;
 
 export function optional<T>(value: unknown, validate: (v: unknown) => T): T | undefined {
   return value === undefined ? undefined : validate(value);
@@ -117,4 +119,34 @@ export function validDescription(value: unknown): string | undefined {
     );
   }
   return trimmed === "" ? undefined : trimmed;
+}
+
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+
+export function validReceiptKey(value: unknown, householdId: number): string {
+  if (typeof value !== "string" || value.length > 200) {
+    throw new HttpError(400, "Invalid key");
+  }
+  const pattern = new RegExp(`^receipts/${householdId}/${UUID}\\.jpg$`);
+  if (!pattern.test(value)) {
+    throw new HttpError(400, "Invalid key");
+  }
+  return value;
+}
+
+export function validReceiptContentType(value: unknown): "image/jpeg" {
+  if (value !== "image/jpeg") throw new HttpError(400, "Invalid content type");
+  return value;
+}
+
+export function validReceiptSize(value: unknown): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > MAX_RECEIPT_BYTES
+  ) {
+    throw new HttpError(400, "Invalid size");
+  }
+  return value;
 }

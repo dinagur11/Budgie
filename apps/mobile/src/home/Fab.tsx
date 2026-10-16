@@ -4,11 +4,11 @@ import { router } from "expo-router";
 import { Icon, type IconName } from "../components/Icon";
 import { colors, fonts, shadows } from "../theme";
 
-// the add button with its menu: photograph a receipt (not built yet: a "coming soon" screen), create a recurring expense
+// the add button with its menu: photograph a receipt (scan-receipt), create a recurring expense
 // or an expense (for the selected household). Categories are created from the expense forms and the household settings.
 export function Fab() {
   const [open, setOpen] = useState(false);
-  const go = (href: "/create-expense" | "/create-rule") => {
+  const go = (href: "/create-expense" | "/scan-receipt" | "/create-rule") => {
     setOpen(false);
     router.push(href);
   };
@@ -20,14 +20,7 @@ export function Fab() {
           <View style={styles.menu}>
             {/* top to bottom: create expense, photograph receipt, create recurring expense */}
             <MenuItem label="Create Expense" icon="receipt-long" onPress={() => go("/create-expense")} />
-            <MenuItem
-              label="Photograph Receipt"
-              icon="photo-camera"
-              onPress={() => {
-                setOpen(false);
-                router.push({ pathname: "/coming-soon", params: { title: "Photograph receipt", text: "Photograph a receipt and Budgie suggests the expense for you. This is going to be available soon." } });
-              }}
-            />
+            <MenuItem label="Photograph Receipt" icon="photo-camera" onPress={() => go("/scan-receipt")} />
             <MenuItem label="Create Recurring Expense" icon="update" onPress={() => go("/create-rule")} />
           </View>
         )}

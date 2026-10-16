@@ -13,6 +13,8 @@ export const config = {
   databaseUrl: required("DATABASE_URL"),
   cognitoUserPoolId: required("COGNITO_USER_POOL_ID"),
   cognitoClientId: required("COGNITO_CLIENT_ID"),
-  // not used yet; make it required() when the OpenAI code is added
-  openaiApiKey: process.env.OPENAI_API_KEY,
+  awsRegion: required("AWS_REGION"),
+  s3ReceiptsBucket: required("S3_BUCKET"),
+  openaiApiKey: required("OPENAI_API_KEY"),
+  openaiReceiptModel: required("OPENAI_RECEIPT_MODEL"),
 };

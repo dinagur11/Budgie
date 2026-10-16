@@ -3,7 +3,7 @@ import { Button } from "../src/components/Button";
 import { Placeholder } from "../src/components/Placeholder";
 import { Screen } from "../src/components/Screen";
 
-// placeholder for screens that aren't built yet (the "+" menu's "Photograph Receipt", the profile); ?title=&text=
+// placeholder for screens that aren't built yet; ?title=&text=
 export default function ComingSoonScreen() {
   const { title = "Coming soon", text = "This screen is coming soon." } = useLocalSearchParams<{ title?: string; text?: string }>();
   return (

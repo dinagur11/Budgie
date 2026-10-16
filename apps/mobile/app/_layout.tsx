@@ -62,6 +62,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="create-household" options={{ presentation: "modal" }} />
           <Stack.Screen name="create-expense" options={{ presentation: "modal" }} />
+          <Stack.Screen name="scan-receipt" options={{ presentation: "modal" }} />
           <Stack.Screen name="edit-expense" options={{ presentation: "modal" }} />
           <Stack.Screen name="create-rule" options={{ presentation: "modal" }} />
           <Stack.Screen name="edit-rule" options={{ presentation: "modal" }} />

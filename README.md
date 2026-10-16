@@ -1,6 +1,6 @@
 # Budgie
 
-Budgie is a mobile app for tracking a household's expenses together. Everyone in a household logs what they paid, recurring bills are added on schedule, and you can see where the month's money went, by category, by payer and over time.
+Budgie is a mobile app for tracking a household's expenses together. Everyone in a household logs what they paid (or photographs the receipt and lets Budgie fill in the expense), recurring bills are added on schedule, and you can see where the month's money went, by category, by payer and over time.
 
 <table>
   <tr>
@@ -15,6 +15,10 @@ Budgie is a mobile app for tracking a household's expenses together. Everyone in
     <td align="center"><img src="docs/screenshots/members.png" width="220" alt="Members and invites"><br><sub>Members</sub></td>
     <td align="center"><img src="docs/screenshots/household-settings.png" width="220" alt="Household settings and categories"><br><sub>Household settings</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/scan-receipt.png" width="220" alt="Photograph a receipt: take a photo or choose one from the gallery"><br><sub>Photograph a receipt</sub></td>
+    <td align="center"><img src="docs/screenshots/receipt-expense.png" width="220" alt="The create expense form filled in from a receipt"><br><sub>Filled in from the receipt</sub></td>
+  </tr>
 </table>
 
 <sub>Screenshots use the app's fixture mode (made-up data, no backend).</sub>
@@ -24,6 +28,7 @@ Budgie is a mobile app for tracking a household's expenses together. Everyone in
 - **Households.** Create a household with a default currency and a time zone, and share it with others. Each person can belong to several households.
 - **Members and invites.** Owners create single-use invite links that expire after 7 days, remove members and manage the household. Members can leave, and if the last owner leaves, another member becomes owner.
 - **Expenses.** Log an expense with its amount, currency, date (picked on a calendar), category, payer and an optional description. The payer, the creator or an owner can edit or remove it. Expenses can't be dated in the future.
+- **Photograph receipts.** Take a photo of a receipt or pick one from the gallery. Budgie reads the store, total, currency, date, items and a likely category, and opens the expense form filled in for you to check before saving. The photo is shrunk on the phone, uploaded straight to private storage and deleted as soon as it has been read.
 - **Recurring expenses.** Daily, weekly, every two weeks, monthly or yearly, with an optional end date. Past occurrences are filled in when one is created. Upcoming ones appear on the calendar but aren't counted as spent until they're due.
 - **Month view.** Each household's month has the total spent, what's still scheduled, the expense list (filter by category or payer), the recurring expenses and a calendar with category-colored dots. Arrows step back through earlier months.
 - **Categories.** Built-in categories, plus each household's own, which can be renamed, archived or deleted.
@@ -32,7 +37,7 @@ Budgie is a mobile app for tracking a household's expenses together. Everyone in
 - **Multiple currencies.** Amounts are kept per currency and never converted or added across currencies.
 - **Accounts.** Sign up with email and a confirmation code (AWS Cognito), change your name and password, and log out.
 
-Coming next: photographing receipts (an LLM suggests the category), questions about your spending in plain English, monthly reports, joining a household from an invite link inside the app, and a full calendar tab.
+Coming next: questions about your spending in plain English, monthly reports, joining a household from an invite link inside the app, and a full calendar tab.
 
 ## Tech stack
 
@@ -42,6 +47,7 @@ Coming next: photographing receipts (an LLM suggests the category), questions ab
 | Backend API | TypeScript, Express 5, Node (ESM) |
 | Database | PostgreSQL 16 with Prisma 7 (`pg` driver adapter) |
 | Auth | AWS Cognito (the app's own sign-in screens; the API verifies ID tokens) |
+| Receipts | AWS S3 (presigned uploads, images deleted after reading), the OpenAI API (reads the receipt), `expo-image-picker` and `expo-image-manipulator` on the phone |
 | Tests | Vitest (with Supertest against a real Postgres database for the API) |
 
 ## Repository layout
@@ -64,6 +70,7 @@ The two apps are separate npm projects with no workspaces. Run each one's comman
 - Node.js and npm
 - Docker, for the local database
 - An AWS Cognito user pool with an app client that has no client secret and has self-registration turned on
+- For receipts: an S3 bucket (with a lifecycle rule that expires leftover `receipts/` images), AWS credentials allowed `s3:PutObject`, `s3:GetObject` and `s3:DeleteObject` on `receipts/*` and `s3:ListBucket` on the bucket, and an OpenAI API key
 - For the app: Xcode (iOS) or Android Studio with an emulator. The app uses native modules, so it runs as an Expo development build, not in Expo Go.
 
 ### Database
@@ -85,7 +92,7 @@ npm run db:seed         # the built-in categories
 npm run dev             # http://localhost:3000 (or PORT)
 ```
 
-`.env` needs `DATABASE_URL`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `OPENAI_API_KEY` and optionally `PORT`. Never commit it.
+`.env` needs `DATABASE_URL`, `AWS_REGION`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `S3_BUCKET`, `OPENAI_API_KEY`, `OPENAI_RECEIPT_MODEL` and optionally `PORT`. AWS credentials come from the usual AWS SDK sources (environment, profile or role). Never commit it.
 
 ### Mobile app (`apps/mobile`)
 
@@ -108,13 +115,13 @@ cd apps/api
 npx prisma migrate deploy
 npx vitest run
 
-# Mobile: unit tests for the pure modules (money, dates, validation, charts, filters, permissions)
+# Mobile: unit tests for the pure modules (money, dates, validation, charts, filters, permissions, receipts)
 cd apps/mobile
 npx vitest run
 npx tsc --noEmit
 ```
 
-The API tests run against the real Express app and a real database, with Cognito replaced by a test header. Never point them at the development database.
+The API tests run against the real Express app and a real database, with Cognito replaced by a test header and S3 presigning mocked (no AWS or OpenAI calls). Never point them at the development database.
 
 ## API at a glance
 
@@ -129,5 +136,6 @@ Every route needs a Cognito ID token (`Authorization: Bearer <token>`).
 | Expenses | `/households/:id/expenses` (create, list with filters and cursor pagination, get, update, delete) |
 | Recurring expenses | `/households/:id/rules` (create, list, get, update, delete) |
 | Month views | `GET /households/:id/calendar?month=`, `GET /households/:id/summary?month=` |
+| Receipts | `POST /households/:id/receipts` (a presigned upload URL), `POST /households/:id/receipts/analyze` (the suggested expense) |
 
 [claude.md](claude.md) documents every endpoint, its rules and error responses, and the data model behind them.

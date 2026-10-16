@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { HttpError } from "../middleware/errorHandler.js";
 import { requireMember, requireOwner } from "../middleware/household.js";
-import { validName, validCurrency, validTimeZone, validId, optional, validBoolean, validAmount, validDate, validDescription, validFrequency, validMonth } from "../lib/validate.js";
+import { validName, validCurrency, validTimeZone, validId, optional, validBoolean, validAmount, validDate, validDescription, validFrequency, validMonth, validReceiptKey, validReceiptContentType, validReceiptSize } from "../lib/validate.js";
 import { createHousehold, updateHousehold, leaveHousehold, removeMember, deleteHousehold, getMembers, getHouseholdData} from "../services/householdsService.js"
 import { createInvite, previewInvite, acceptInvite, listInvites, cancelInvite } from "../services/invitesService.js";
 import { createCategory, deleteCategory, updateCategory, getAllCategories } from "../services/categoriesService.js"
@@ -10,6 +10,7 @@ import { decodeExpenseCursor } from "../lib/cursor.js";
 import { createRule, listRules, getRule, updateRule, deleteRule } from "../services/recurringRulesService.js";
 import { getCalendar } from "../services/calendarService.js";
 import { getSummary } from "../services/summaryService.js";
+import { analyzeReceipt, createReceiptUpload } from "../services/receiptsService.js";
 
 export const householdsRouter = Router();
 
@@ -360,4 +361,24 @@ householdsRouter.get("/:id/summary", requireMember, async (req, res) => {
     const { first, last } = validMonth(req.query.month);
     const summary = await getSummary(householdId, first, last);
     return res.status(200).json(summary);
+})
+
+/* receipts */
+//a presigned URL to upload one receipt image (JPEG, up to 5,000,000 bytes) straight to S3
+householdsRouter.post("/:id/receipts", requireMember, async (req, res) => {
+    const { contentType, byteSize } = req.body ?? { };
+    const householdId = req.membership!.householdId;
+    const upload = await createReceiptUpload(householdId, {
+        contentType: validReceiptContentType(contentType),
+        byteSize: validReceiptSize(byteSize),
+    });
+    return res.status(200).json(upload);
+})
+
+householdsRouter.post("/:id/receipts/analyze", requireMember, async (req, res) => {
+    const { key } = req.body ?? { };
+    const householdId = req.membership!.householdId;
+    const validatedKey = validReceiptKey(key, householdId);
+    const suggestion = await analyzeReceipt(householdId, validatedKey);
+    return res.status(200).json(suggestion);
 })

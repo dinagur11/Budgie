@@ -84,3 +84,20 @@ export type Rule = {
   expenseCount: number;
   nearingLimit: boolean;
 };
+
+// POST /households/:id/receipts: a presigned S3 URL for one JPEG (PUT the raw bytes, no Authorization header).
+// key is sent to /receipts/analyze; expiresAt is an ISO timestamp (the URL is valid for 5 minutes)
+export type ReceiptUpload = { key: string; uploadUrl: string; expiresAt: string };
+
+// POST /households/:id/receipts/analyze: suggested expense fields read from the receipt (the image is deleted right after).
+// Every field is null when it couldn't be read; isReceipt false means every other field is null.
+// amount is in minor units; date is never after the household's today; categoryId is usable (built-in or the household's, not archived)
+export type ReceiptSuggestion = {
+  isReceipt: boolean;
+  name: string | null;
+  amount: number | null;
+  currency: Currency | null;
+  date: string | null;
+  categoryId: number | null;
+  description: string | null;
+};

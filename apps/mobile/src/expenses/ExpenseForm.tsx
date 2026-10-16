@@ -12,17 +12,19 @@ import { Button } from "../components/Button";
 import { Banner } from "../components/Banner";
 import { ErrorView, LoadingView } from "../components/StateViews";
 import { useCategories, useCreateExpense, useExpense, useHousehold, useMe, useMembers, useUpdateExpense, type ExpenseUpdate } from "../api/hooks";
-import type { Category, Currency, Expense, Household, Member } from "../api/types";
+import type { Category, Currency, Expense, Household, Member, ReceiptSuggestion } from "../api/types";
 import { errorMessage } from "../api/errors";
 import { useHouseholdSelection } from "../household/HouseholdContext";
 import { categoryColor } from "../lib/categoryColors";
 import { addDays, longDateLabel, todayInTimeZone } from "../lib/dates";
 import { amountInput, parseAmount } from "../lib/money";
+import { suggestionToFormDefaults } from "../lib/receipt";
 import { validateAmount, validateDescription, validateExpenseDate, validateName } from "../lib/validate";
 import { colors, type as t } from "../theme";
 
 // The create and edit expense screens (POST, or PATCH /households/:id/expenses/:expenseId) for the selected household.
-export function ExpenseScreen({ expenseId }: { expenseId?: number | null }) {
+// suggestion (create only): a scanned receipt's fields, used as the form's starting values
+export function ExpenseScreen({ expenseId, suggestion }: { expenseId?: number | null; suggestion?: ReceiptSuggestion | null }) {
   const editing = expenseId !== undefined;
   const { selectedId } = useHouseholdSelection();
   const household = useHousehold(selectedId);
@@ -51,6 +53,7 @@ export function ExpenseScreen({ expenseId }: { expenseId?: number | null }) {
             members={members.data!}
             myId={me.data!.id}
             expense={editing ? expense.data : undefined}
+            suggestion={editing ? null : suggestion}
           />
         )}
         <Button label="Cancel" variant="text" onPress={() => router.back()} />
@@ -61,9 +64,9 @@ export function ExpenseScreen({ expenseId }: { expenseId?: number | null }) {
 
 type Errors = Partial<Record<"name" | "amount" | "date" | "category" | "description", string | null>>;
 
-type FormProps = { household: Household; categories: Category[]; members: Member[]; myId: number; expense?: Expense };
+type FormProps = { household: Household; categories: Category[]; members: Member[]; myId: number; expense?: Expense; suggestion?: ReceiptSuggestion | null };
 
-function ExpenseForm({ household, categories, members, myId, expense }: FormProps) {
+function ExpenseForm({ household, categories, members, myId, expense, suggestion }: FormProps) {
   const create = useCreateExpense(household.id);
   const update = useUpdateExpense(household.id, expense?.id ?? 0);
   const mutation = expense ? update : create;
@@ -71,15 +74,19 @@ function ExpenseForm({ household, categories, members, myId, expense }: FormProp
   const descriptionOnly = !!expense?.isRecurring;
   // "today" is the household's, the same day the backend checks against
   const today = todayInTimeZone(household.timeZone);
-  const [name, setName] = useState(expense?.name ?? "");
-  const [amount, setAmount] = useState(expense ? amountInput(expense.amount) : "");
-  const [currency, setCurrency] = useState<Currency>(expense?.currency ?? household.defaultCurrency);
-  const [date, setDate] = useState(expense?.date ?? today);
-  const [categoryId, setCategoryId] = useState<number | null>(expense?.categoryId ?? null);
+  // a scanned receipt's suggestion; unread fields fall back to the empty form's defaults
+  const [prefill] = useState(() =>
+    suggestion ? suggestionToFormDefaults(suggestion, household, today, categories.filter((c) => !c.isArchived).map((c) => c.id)) : null,
+  );
+  const [name, setName] = useState(expense?.name ?? prefill?.name ?? "");
+  const [amount, setAmount] = useState(expense ? amountInput(expense.amount) : prefill?.amount ?? "");
+  const [currency, setCurrency] = useState<Currency>(expense?.currency ?? prefill?.currency ?? household.defaultCurrency);
+  const [date, setDate] = useState(expense?.date ?? prefill?.date ?? today);
+  const [categoryId, setCategoryId] = useState<number | null>(expense?.categoryId ?? prefill?.categoryId ?? null);
   const [paidById, setPaidById] = useState<number | undefined>(
     expense?.paidById ?? (members.some((m) => m.userId === myId && m.isActive) ? myId : members.find((m) => m.isActive)?.userId),
   );
-  const [description, setDescription] = useState(expense?.description ?? "");
+  const [description, setDescription] = useState(expense?.description ?? prefill?.description ?? "");
   const [errors, setErrors] = useState<Errors>({});
 
   // new expenses need a usable category and an active payer; an edited expense also keeps its current ones
@@ -124,6 +131,7 @@ function ExpenseForm({ household, categories, members, myId, expense }: FormProp
   return (
     <>
       {mutation.isError && <Banner message={errorMessage(mutation.error)} />}
+      {prefill && <Text style={styles.hint}>Filled in from your receipt. Check every field before creating the expense.</Text>}
       {descriptionOnly ? (
         <Text style={styles.hint}>
           This expense comes from a recurring expense, so only its description can be changed here. Its name, amount, date,

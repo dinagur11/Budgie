@@ -1,0 +1,14 @@
+import { analyzeReceipt } from "../src/services/receiptsService.js";
+import { prisma } from "../src/prisma.js";
+
+const householdId = 1;
+const key = "receipts/1/receipt-test.jpg";
+
+try {
+  console.log(JSON.stringify(await analyzeReceipt(householdId, key), null, 2));
+} catch (err) {
+  console.error("Failed:", (err as { status?: number }).status, (err as Error).message);
+} finally {
+  await prisma.$disconnect();
+  process.exit(0);
+}
