@@ -14,8 +14,8 @@ import { validateEmail, validateLoginPassword } from "../../src/lib/validate";
 import { authStyles as styles } from "../../src/components/authStyles";
 
 export default function LoginScreen() {
-  // ?confirmed=1 after confirming an email without an automatic sign-in
-  const { confirmed } = useLocalSearchParams<{ confirmed?: string }>();
+  // ?confirmed=1 after confirming an email without an automatic sign-in, ?reset=1 after a password reset
+  const { confirmed, reset } = useLocalSearchParams<{ confirmed?: string; reset?: string }>();
   const { refresh } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,6 +46,7 @@ export default function LoginScreen() {
     <Screen top={<AuthTop title="Welcome back" subtitle="Log in to see your households and what they've spent." />}>
       <Card style={styles.card}>
         {confirmed === "1" && !banner && <Banner tone="success" message="Your email is confirmed. Log in to continue." />}
+        {reset === "1" && !banner && <Banner tone="success" message="Your password was changed. Log in with the new one." />}
         {banner && <Banner message={banner} />}
         <TextField
           label="Email"
@@ -72,6 +73,11 @@ export default function LoginScreen() {
           onSubmitEditing={submit}
         />
         <Button label="Log in" onPress={submit} loading={loading} />
+        <Button
+          label="Forgot password?"
+          variant="text"
+          onPress={() => router.push({ pathname: "/forgot-password", params: { email: email.trim() } })}
+        />
       </Card>
       <View style={styles.footer}>
         <Text style={styles.footerText}>New to Budgie?</Text>

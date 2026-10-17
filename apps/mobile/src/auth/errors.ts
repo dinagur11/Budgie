@@ -20,7 +20,7 @@ const BY_NAME: Record<string, string> = {
 };
 
 // Cognito returns NotAuthorizedException for several unrelated problems; only on sign-in does it mean a wrong password
-export type AuthAction = "signIn" | "signUp" | "confirm" | "changePassword";
+export type AuthAction = "signIn" | "signUp" | "confirm" | "changePassword" | "resetPassword";
 
 const SIGNUP_DISABLED = "New accounts can't be created right now. Please try again later.";
 const CLIENT_MISCONFIGURED = "The app isn't set up correctly. Please try again later.";
@@ -44,6 +44,8 @@ export function authErrorMessage(error: unknown, action: AuthAction = "signIn"):
   // the raw Cognito error helps while developing; it never holds a token or a password
   if (typeof __DEV__ !== "undefined" && __DEV__) console.warn(`[auth] ${action} failed: ${name} ${message}`);
   if (name === "NotAuthorizedException") return notAuthorizedMessage(message, action);
+  // a reset must not reveal whether the email exists either: an unknown user reads like a wrong code
+  if (action === "resetPassword" && name === "UserNotFoundException") return BY_NAME.CodeMismatchException;
   if (name in BY_NAME) return BY_NAME[name];
   if (/network/i.test(message)) return BY_NAME.NetworkError;
   return GENERIC;

@@ -38,3 +38,16 @@ describe("authErrorMessage", () => {
     expect(authErrorMessage("boom")).toBe("Something went wrong. Please try again.");
   });
 });
+
+describe("authErrorMessage for a password reset", () => {
+  it("an unknown email reads like a wrong code", () => {
+    expect(authErrorMessage(err("UserNotFoundException"), "resetPassword")).toMatch(/code is incorrect/);
+  });
+
+  it("code and password errors", () => {
+    expect(authErrorMessage(err("CodeMismatchException"), "resetPassword")).toMatch(/code is incorrect/);
+    expect(authErrorMessage(err("ExpiredCodeException"), "resetPassword")).toMatch(/expired/);
+    expect(authErrorMessage(err("InvalidPasswordException"), "resetPassword")).toMatch(/requirements/);
+    expect(authErrorMessage(err("LimitExceededException"), "resetPassword")).toMatch(/Too many attempts/);
+  });
+});

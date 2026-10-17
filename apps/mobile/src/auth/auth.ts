@@ -50,3 +50,13 @@ export async function signOut() {
 export async function changePassword(oldPassword: string, newPassword: string) {
   await Amplify.updatePassword({ oldPassword, newPassword });
 }
+
+// forgot password: Cognito emails a 6-digit code to the account's verified email
+export async function requestPasswordReset(email: string) {
+  await Amplify.resetPassword({ username: email.trim() });
+}
+
+// the code and the new password together; the user is not signed in afterwards
+export async function confirmPasswordReset(email: string, code: string, newPassword: string) {
+  await Amplify.confirmResetPassword({ username: email.trim(), confirmationCode: code.trim(), newPassword });
+}

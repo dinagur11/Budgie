@@ -1,7 +1,7 @@
 import { StyleSheet } from "react-native";
 import { colors, type as t } from "../theme";
 
-// shared by the login, register and confirm screens (their title is in AuthTop)
+// shared by the login, register, confirm and forgot-password screens (their title is in AuthTop)
 export const authStyles = StyleSheet.create({
   card: { padding: 16, gap: 14 },
   hint: { ...t.bodySm, color: colors.onSurfaceVariant },
