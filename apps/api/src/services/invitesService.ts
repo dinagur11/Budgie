@@ -6,6 +6,8 @@ import { lockHousehold } from "./householdsService.js";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_ACTIVE_INVITES = 25;
+// old invites are kept this long, so a stale link still answers 410 instead of 404
+const INVITE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 function hashToken(token: string): string {
     return createHash("sha256").update(token).digest("hex");
@@ -51,6 +53,21 @@ export async function cancelInvite(householdId: number, inviteId: number) {
     });
     if (deleted.count === 0)
         throw new HttpError(404, "Invite not found");
+}
+
+//deletes invites that expired, or were accepted, more than 30 days ago; run daily by jobs/cleanupInvites.ts
+//no lock needed: accept only claims an invite while expiresAt is in the future, so it never touches these rows
+export async function cleanupInvites(now = new Date()) {
+    const cutoff = new Date(now.getTime() - INVITE_RETENTION_MS);
+    const deleted = await prisma.invite.deleteMany({
+        where: {
+            OR: [
+                { expiresAt: { lt: cutoff } },
+                { status: "ACCEPTED", acceptedAt: { lt: cutoff } },
+            ],
+        },
+    });
+    return deleted.count;
 }
 
 //household name and active members for the join screen; changes nothing

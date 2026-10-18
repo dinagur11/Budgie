@@ -37,7 +37,7 @@ Budgie is a mobile app for tracking a household's expenses together. Everyone in
 - **Multiple currencies.** Amounts are kept per currency and never converted or added across currencies.
 - **Accounts.** Sign up with email and a confirmation code (AWS Cognito), change your name and password, and log out.
 
-Coming next: questions about your spending in plain English, monthly reports, joining a household from an invite link inside the app, and a full calendar tab.
+Coming next: questions about your spending in plain English, monthly reports, joining a household from an invite link inside the app, an optional monthly spending limit for a household, and notifications for the household.
 
 ## Tech stack
 
@@ -92,7 +92,7 @@ npm run db:seed         # the built-in categories
 npm run dev             # http://localhost:3000 (or PORT)
 ```
 
-`.env` needs `DATABASE_URL`, `AWS_REGION`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `S3_BUCKET`, `OPENAI_API_KEY`, `OPENAI_RECEIPT_MODEL` and optionally `PORT`. AWS credentials come from the usual AWS SDK sources (environment, profile or role). Never commit it.
+`.env` needs `DATABASE_URL`, `AWS_REGION`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `S3_BUCKET`, `OPENAI_API_KEY`, `OPENAI_RECEIPT_MODEL` and optionally `PORT`. AWS credentials come from the usual AWS SDK sources (environment, profile or role); on Railway, which has no AWS role, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. A second Railway service runs the daily invite cleanup (`node dist/src/jobs/cleanupInvites.js` on the cron schedule `0 3 * * *`) and needs only `DATABASE_URL`. Railway settings are kept in the dashboard, not in config files. Never commit it.
 
 ### Mobile app (`apps/mobile`)
 
