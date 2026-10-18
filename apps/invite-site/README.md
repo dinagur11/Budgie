@@ -8,8 +8,9 @@ domain root, which a project site such as `dinagur11.github.io/budgie` can't ser
   through an Android intent) and falls back to the Play Store listing. The token stays in the fragment, so it never
   reaches GitHub's servers. No scripts or styles from elsewhere, no analytics.
 - `.well-known/assetlinks.json`: lets Android verify the link and open it in the app directly. It lists the SHA-256
-  fingerprint of each key that signs the app. Today only the debug keystore (`apps/mobile/android/app/debug.keystore`,
-  the React Native default). When the app goes on Google Play, add the **app signing key** fingerprint from Play
+  fingerprint of each key that signs the app. Today: the debug keystore (`apps/mobile/android/app/debug.keystore`,
+  the React Native default, for local builds) and the EAS-managed keystore (`eas build --profile preview`, the APK
+  shared with family and friends). When the app goes on Google Play, add the **app signing key** fingerprint from Play
   Console > Test and release > App integrity (and the upload key's, if you install builds signed with it).
 - `.nojekyll`: without it GitHub Pages (Jekyll) skips the `.well-known` folder.
 

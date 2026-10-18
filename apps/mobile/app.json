@@ -60,6 +60,13 @@
     },
     "ios": {
       "bundleIdentifier": "com.budgie.mobile"
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9c97118f-a227-4945-993a-72a01c2cd4f9"
+      }
+    },
+    "owner": "dina-expo"
   }
 }
