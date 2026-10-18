@@ -1,6 +1,6 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "./client";
-import type { CalendarMonth, Category, CreatedInvite, Currency, Expense, Frequency, Household, Rule, Me, Member, MyHousehold, MySpending, Summary } from "./types";
+import type { CalendarMonth, Category, CreatedInvite, InvitePreview, Currency, Expense, Frequency, Household, Rule, Me, Member, MyHousehold, MySpending, Summary } from "./types";
 
 // Every household query key starts with ["household", id], so switching households never shows another household's data.
 // Every endpoint used here exists in apps/api; in fixture mode (src/fixtures) apiFetch answers locally instead.
@@ -164,6 +164,28 @@ export function useRemoveMember(id: number) {
 }
 
 // owner only; single use, valid for 7 days
+// the token travels only in the body; the preview isn't cached after the join screen closes
+export function useInvitePreview(token: string | null) {
+  return useQuery({
+    queryKey: ["invitePreview", token],
+    queryFn: () => apiFetch<InvitePreview>("/households/join/preview", { method: "POST", body: { token } }),
+    enabled: token !== null,
+    gcTime: 0,
+    staleTime: Infinity,
+  });
+}
+
+export function useAcceptInvite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (token: string) => apiFetch<Household>("/households/join", { method: "POST", body: { token } }),
+    onSuccess: async (household) => {
+      queryClient.setQueryData(keys.household(household.id), household);
+      await queryClient.invalidateQueries({ queryKey: keys.me });
+    },
+  });
+}
+
 export function useCreateInvite(id: number) {
   return useMutation({ mutationFn: () => apiFetch<CreatedInvite>(`/households/${id}/invites`, { method: "POST" }) });
 }

@@ -30,6 +30,8 @@ export type Member = { userId: number; name: string; role: Role; joinedAt: strin
 
 // POST /households/:id/invites: the raw token is returned only here; the app builds the link
 export type CreatedInvite = { token: string; expiresAt: string };
+// POST /households/join/preview: active members in joinedAt order, no ids or emails
+export type InvitePreview = { householdName: string; members: { name: string; role: Role }[] };
 
 // GET /households/:id/categories
 export type Category = { id: number; name: string; isArchived: boolean; isBuiltIn: boolean };

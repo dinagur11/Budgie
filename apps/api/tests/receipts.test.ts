@@ -186,3 +186,46 @@ describe("POST /households/:id/receipts", () => {
     });
   });
 });
+
+describe("daily receipt cap on upload", () => {
+  const todayUtc = () => new Date().toISOString().slice(0, 10);
+  const scan = (userId: number, day: string) => prisma.receiptScan.create({ data: { userId, day: new Date(day) } });
+
+  it("429 once the user has used 3 scans today, without presigning", async () => {
+    const { member, h } = await setup();
+    for (let i = 0; i < 3; i++) await scan(member.id, todayUtc());
+    const res = await upload(member, h.id, VALID);
+    expect(res.status).toBe(429);
+    expect(res.body).toEqual({ error: "Daily receipt limit reached" });
+    expect(getSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("2 scans today still allow an upload; older days don't count", async () => {
+    const { member, h } = await setup();
+    await scan(member.id, todayUtc());
+    await scan(member.id, todayUtc());
+    for (let i = 0; i < 3; i++) await scan(member.id, "2026-01-01");
+    expect((await upload(member, h.id, VALID)).status).toBe(200);
+  });
+
+  it("is per user, across households", async () => {
+    const { owner, member, h } = await setup();
+    const other = await createHousehold("Other", member);
+    for (let i = 0; i < 3; i++) await scan(member.id, todayUtc());
+    expect((await upload(member, other.id, VALID)).status).toBe(429);
+    expect((await upload(owner, h.id, VALID)).status).toBe(200);
+  });
+
+  it("'today' is the household's date: scans dated tomorrow in UTC don't count for a household behind UTC", async () => {
+    const { member, h } = await setup();
+    // Pacific/Kiritimati is UTC+14, so its today is on or after the UTC date; Pacific/Pago_Pago (UTC-11) is on or before it
+    await prisma.household.update({ where: { id: h.id }, data: { timeZone: "Pacific/Pago_Pago" } });
+    const kiritimatiToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Kiritimati" }).format(new Date());
+    const pagoToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Pago_Pago" }).format(new Date());
+    expect(kiritimatiToday > pagoToday).toBe(true); // 25 hours apart, so always different dates
+    for (let i = 0; i < 3; i++) await scan(member.id, kiritimatiToday);
+    expect((await upload(member, h.id, VALID)).status).toBe(200);
+    for (let i = 0; i < 3; i++) await scan(member.id, pagoToday);
+    expect((await upload(member, h.id, VALID)).status).toBe(429);
+  });
+});

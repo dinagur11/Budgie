@@ -68,6 +68,7 @@ model User{
     createdExpenses Expense[] @relation("CreatedExpenses")
     paidRecurring RecurringRule[] @relation("PaidRecurring")
     createdRecurring RecurringRule[] @relation("CreatedRecurring")
+    receiptScans ReceiptScan[]
 
     memberships HouseholdMember[]
 }
@@ -182,4 +183,15 @@ model Invite {
     @@index([householdId, status])
 }
 
+// One row per receipt analysis that reached the LLM, for the daily cap (MAX_RECEIPTS_PER_DAY in receiptsService.ts).
+// day is the scanning household's local date; the cap is per user, across households.
+model ReceiptScan {
+    id Int @id @default(autoincrement())
+    userId Int
+    day DateTime @db.Date
+    createdAt DateTime @default(now())
 
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, day])
+}

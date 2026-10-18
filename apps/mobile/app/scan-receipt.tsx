@@ -8,12 +8,12 @@ import { Button } from "../src/components/Button";
 import { Icon } from "../src/components/Icon";
 import { useHouseholdSelection } from "../src/household/HouseholdContext";
 import { useReceiptScan } from "../src/api/receiptScan";
-import { receiptErrorMessage } from "../src/lib/receipt";
+import { canRetryReceipt, receiptErrorMessage } from "../src/lib/receipt";
 import { colors, type as t } from "../src/theme";
 
 type Source = "camera" | "library";
 type Photo = { uri: string; width: number; height: number };
-type View_ = { kind: "choose"; note?: string } | { kind: "notReceipt" } | { kind: "error"; message: string };
+type View_ = { kind: "choose"; note?: string } | { kind: "notReceipt" } | { kind: "error"; message: string; retry: boolean };
 
 // The "+" menu's "Photograph Receipt": take or pick a photo, upload it and have it read, then open the create-expense
 // form prefilled with the suggestion. Nothing is saved until the user confirms the form.
@@ -37,7 +37,7 @@ export default function ScanReceiptScreen() {
       }
       router.replace({ pathname: "/create-expense", params: { receipt: JSON.stringify(suggestion) } });
     } catch (err) {
-      setView({ kind: "error", message: receiptErrorMessage(err) });
+      setView({ kind: "error", message: receiptErrorMessage(err), retry: canRetryReceipt(err) });
     }
   }
 
@@ -94,7 +94,7 @@ export default function ScanReceiptScreen() {
         ) : view.kind === "error" ? (
           <>
             <Message icon="cloud-off" text={view.message} />
-            <Button label="Try again" icon="refresh" onPress={() => void retry()} />
+            {view.retry && <Button label="Try again" icon="refresh" onPress={() => void retry()} />}
             <Button label="Enter manually" variant="tonal" onPress={enterManually} />
           </>
         ) : (

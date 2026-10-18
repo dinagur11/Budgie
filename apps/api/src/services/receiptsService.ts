@@ -1,4 +1,4 @@
-import { Currency } from "../../generated/prisma/client.js"; // import it the same way your other services do
+import { Currency, Prisma } from "../../generated/prisma/client.js";
 import { randomUUID } from "node:crypto";
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -34,6 +34,31 @@ const s3 = new S3Client({ region: config.awsRegion, requestChecksumCalculation: 
 
 const UPLOAD_URL_TTL_SECONDS = 300;
 
+// analyses per user per day (the scanning household's local date), across all their households
+export const MAX_RECEIPTS_PER_DAY = 3;
+const LIMIT_MESSAGE = "Daily receipt limit reached";
+
+async function scansToday(userId: number, today: string, tx: Prisma.TransactionClient = prisma) {
+  return tx.receiptScan.count({ where: { userId, day: new Date(today) } });
+}
+
+// Upload check only: tells the app before it uploads. The real guard is reserveScan in analyze.
+async function assertScansLeft(userId: number, householdId: number) {
+  const household = await prisma.household.findUnique({ where: { id: householdId }, select: { timeZone: true } });
+  if (!household) throw new HttpError(404, "Household not found");
+  if (await scansToday(userId, todayInTimeZone(household.timeZone)) >= MAX_RECEIPTS_PER_DAY)
+    throw new HttpError(429, LIMIT_MESSAGE);
+}
+
+// Records one analysis before the LLM call. Locks the user row so two concurrent analyses can't both take the last scan.
+async function reserveScan(userId: number, today: string) {
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
+    if (await scansToday(userId, today, tx) >= MAX_RECEIPTS_PER_DAY) throw new HttpError(429, LIMIT_MESSAGE);
+    await tx.receiptScan.create({ data: { userId, day: new Date(today) } });
+  });
+}
+
 export type ReceiptUploadInput = {
   contentType: "image/jpeg";
   byteSize: number;
@@ -45,8 +70,9 @@ export type ReceiptUpload = {
   expiresAt: string; // ISO timestamp
 };
 
-// A presigned PUT for one receipt image. Writes nothing to the database.
-export async function createReceiptUpload(householdId: number, input: ReceiptUploadInput): Promise<ReceiptUpload> {
+// A presigned PUT for one receipt image. Writes nothing to the database; 429 when the user has no scans left today.
+export async function createReceiptUpload(householdId: number, userId: number, input: ReceiptUploadInput): Promise<ReceiptUpload> {
+  await assertScansLeft(userId, householdId);
   const key = `receipts/${householdId}/${randomUUID()}.jpg`;
   const command = new PutObjectCommand({
     Bucket: config.s3ReceiptsBucket,
@@ -63,7 +89,8 @@ export async function createReceiptUpload(householdId: number, input: ReceiptUpl
   return { key, uploadUrl, expiresAt };
 }
 
-export async function analyzeReceipt(householdId: number, key: string): Promise<ReceiptSuggestion> {
+// Only an analysis that reaches the LLM uses up a scan (a missing or invalid image doesn't); the image is deleted either way.
+export async function analyzeReceipt(householdId: number, userId: number, key: string): Promise<ReceiptSuggestion> {
   try {
     const household = await prisma.household.findUnique({
       where: { id: householdId },
@@ -79,6 +106,7 @@ export async function analyzeReceipt(householdId: number, key: string): Promise<
 
     const image = await downloadReceipt(key);
     const today = todayInTimeZone(household.timeZone);
+    await reserveScan(userId, today);
 
     let raw: RawReceiptExtraction;
     try {

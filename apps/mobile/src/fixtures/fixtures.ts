@@ -149,6 +149,11 @@ export function fixtureResponse(path: string, scenario: Scenario): unknown {
   if (route === "/me/spending") return mySpending(scenario, requestedMonth);
   if (route === "/me/households")
     return scenario === "home" ? households.map((h): MyHousehold => ({ householdId: h.id, name: h.name, role: h.role })) : [];
+  // any token previews a made-up household; joining it answers like the backend (the household isn't in the lists)
+  if (route === "/households/join/preview")
+    return { householdName: "Beach House", members: [{ name: "Noa", role: "OWNER" }, { name: "Eli", role: "MEMBER" }] };
+  if (route === "/households/join")
+    return { id: 99, name: "Beach House", defaultCurrency: "ILS", timeZone: "Asia/Jerusalem", role: "MEMBER" } satisfies Household;
   const one = /^\/households\/(\d+)\/expenses\/(\d+)$/.exec(route);
   const rule = /^\/households\/(\d+)\/rules(?:\/(\d+))?$/.exec(route);
   if (rule) {

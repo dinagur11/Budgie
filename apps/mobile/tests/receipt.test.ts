@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseSuggestionParam, receiptErrorMessage, ReceiptUploadError, suggestionToFormDefaults } from "../src/lib/receipt";
+import { canRetryReceipt, parseSuggestionParam, receiptErrorMessage, ReceiptUploadError, suggestionToFormDefaults } from "../src/lib/receipt";
 import { ApiError } from "../src/api/errors";
 import { parseAmount } from "../src/lib/money";
 import type { ReceiptSuggestion } from "../src/api/types";
@@ -67,7 +67,7 @@ describe("receiptErrorMessage", () => {
   it("maps each failure to a friendly message", () => {
     expect(receiptErrorMessage(new ApiError(502, "Couldn't read the receipt"))).toBe("Couldn't read the receipt. Try again, or enter the expense manually.");
     expect(receiptErrorMessage(new ApiError(0, "x"))).toBe("Can't reach the server. Check your connection and try again.");
-    expect(receiptErrorMessage(new ApiError(429, "Too many requests"))).toBe("Too many receipts at once. Wait a moment and try again.");
+    expect(receiptErrorMessage(new ApiError(429, "Daily receipt limit reached"))).toBe("You've used today's 3 receipt scans. Enter the expense manually, or scan again tomorrow.");
     expect(receiptErrorMessage(new ApiError(404, "Receipt not found"))).toBe("Upload expired, try again.");
     expect(receiptErrorMessage(new ReceiptUploadError())).toBe("The photo couldn't be uploaded. Check your connection and try again.");
     expect(receiptErrorMessage(new ApiError(400, "Receipt image is too large"))).toBe("That photo is too large. Try another one.");
@@ -79,5 +79,13 @@ describe("receiptErrorMessage", () => {
     expect(receiptErrorMessage(new ApiError(500, "Internal server error"))).toBe(generic);
     expect(receiptErrorMessage(new Error("https://bucket.s3/receipts?X-Amz-Signature=secret"))).toBe(generic);
     expect(receiptErrorMessage("boom")).toBe(generic);
+  });
+});
+
+describe("canRetryReceipt", () => {
+  it("is false only for the daily limit", () => {
+    expect(canRetryReceipt(new ApiError(429, "Daily receipt limit reached"))).toBe(false);
+    expect(canRetryReceipt(new ApiError(502, "Couldn't read the receipt"))).toBe(true);
+    expect(canRetryReceipt(new ReceiptUploadError())).toBe(true);
   });
 });

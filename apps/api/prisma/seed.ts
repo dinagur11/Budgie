@@ -2,8 +2,8 @@
 import { prisma } from "../src/prisma.js"; 
 
 const DEFAULT_CATEGORIES = [
-  "Groceries", "Rent", "Utilities", "Transport",
-  "Dining out", "Health", "Entertainment", "Other",
+  "Groceries", "Housing & Rent", "Utilities", "Transportation", "Travel",
+  "Dining out", "Health & Wellness", "Entertainment", "Shopping", "Other",
 ];
 
 async function main() {

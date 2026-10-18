@@ -66,17 +66,27 @@ export class ReceiptUploadError extends Error {
   }
 }
 
-// what the scan screen shows when a scan fails; every error offers "Try again" (the whole upload and analysis again,
-// since the backend deletes the image after every analysis) and "Enter manually"
+// the backend's daily cap per user (MAX_RECEIPTS_PER_DAY in receiptsService.ts), only for the message
+export const RECEIPTS_PER_DAY = 3;
+
+const isDailyLimit = (error: unknown) => error instanceof ApiError && error.status === 429;
+
+// what the scan screen shows when a scan fails; every error offers "Enter manually", and "Try again" (the whole upload
+// and analysis again, since the backend deletes the image after every analysis) unless canRetryReceipt says no
 export function receiptErrorMessage(error: unknown): string {
   if (error instanceof ReceiptUploadError) return "The photo couldn't be uploaded. Check your connection and try again.";
   if (error instanceof ApiError) {
     if (error.status === 0) return "Can't reach the server. Check your connection and try again.";
     if (error.status === 404 && error.message === "Receipt not found") return "Upload expired, try again.";
-    if (error.status === 429) return "Too many receipts at once. Wait a moment and try again.";
+    if (isDailyLimit(error)) return `You've used today's ${RECEIPTS_PER_DAY} receipt scans. Enter the expense manually, or scan again tomorrow.`;
     if (error.status === 502) return "Couldn't read the receipt. Try again, or enter the expense manually.";
     if (error.status === 400 && error.message === "Receipt image is too large") return "That photo is too large. Try another one.";
     if (error.status === 401) return error.message;
   }
   return "Something went wrong reading the receipt. Please try again.";
+}
+
+// retrying can't help once the daily limit is reached
+export function canRetryReceipt(error: unknown): boolean {
+  return !isDailyLimit(error);
 }

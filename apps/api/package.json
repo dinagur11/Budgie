@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "start": "node dist/src/server.js",
     "build": "tsc",
     "test": "vitest run",
     "db:migrate": "prisma migrate dev",
@@ -14,26 +15,26 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",
     "@aws-sdk/s3-request-presigner": "^3.1152.0",
-    "@prisma/adapter-pg": "^7.10.0",
-    "@prisma/client": "^7.10.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
     "aws-jwt-verify": "^5.2.1",
-    "cors": "^2.8.6",
     "dotenv": "^18.0.7",
     "express": "^5.3.0",
-    "node-cron": "^4.6.0",
     "openai": "^7.34.0",
     "pg": "^8.23.1"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",
-    "prisma": "^7.10.0",
+    "prisma": "7.10.0",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.4"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

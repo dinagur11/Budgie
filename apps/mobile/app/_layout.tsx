@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Stack } from "expo-router";
+import { Stack, router, usePathname, useRootNavigationState } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -9,6 +9,7 @@ import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from "@expo-goog
 import { configureAmplify } from "../src/auth/amplify";
 import { SessionProvider, useSession } from "../src/auth/session";
 import { HouseholdProvider } from "../src/household/HouseholdContext";
+import { usePendingInvite } from "../src/invite/pendingInvite";
 import { ApiError } from "../src/api/errors";
 import { colors } from "../src/theme";
 
@@ -70,11 +71,27 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
           <Stack.Screen name="coming-soon" />
           <Stack.Screen name="account-settings" />
           <Stack.Screen name="profile" />
+          <Stack.Screen name="join" options={{ presentation: "modal" }} />
         </Stack.Protected>
         <Stack.Protected guard={!signedIn}>
           <Stack.Screen name="(auth)" />
         </Stack.Protected>
       </Stack>
+      {signedIn && <OpenPendingInvite />}
     </HouseholdProvider>
   );
+}
+
+// Opens the join screen for an invite link (app/+native-intent.tsx). Signed out, the token waits
+// (src/invite/pendingInvite.ts) until someone signs in, or registers and confirms. The join screen takes the token,
+// so this opens it once.
+function OpenPendingInvite() {
+  const token = usePendingInvite();
+  const pathname = usePathname();
+  const navigationReady = !!useRootNavigationState()?.key;
+
+  useEffect(() => {
+    if (token !== null && navigationReady && pathname !== "/join") router.push("/join");
+  }, [token, navigationReady, pathname]);
+  return null;
 }

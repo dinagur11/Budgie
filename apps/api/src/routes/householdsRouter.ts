@@ -368,7 +368,7 @@ householdsRouter.get("/:id/summary", requireMember, async (req, res) => {
 householdsRouter.post("/:id/receipts", requireMember, async (req, res) => {
     const { contentType, byteSize } = req.body ?? { };
     const householdId = req.membership!.householdId;
-    const upload = await createReceiptUpload(householdId, {
+    const upload = await createReceiptUpload(householdId, req.user!.id, {
         contentType: validReceiptContentType(contentType),
         byteSize: validReceiptSize(byteSize),
     });
@@ -379,6 +379,6 @@ householdsRouter.post("/:id/receipts/analyze", requireMember, async (req, res) =
     const { key } = req.body ?? { };
     const householdId = req.membership!.householdId;
     const validatedKey = validReceiptKey(key, householdId);
-    const suggestion = await analyzeReceipt(householdId, validatedKey);
+    const suggestion = await analyzeReceipt(householdId, req.user!.id, validatedKey);
     return res.status(200).json(suggestion);
 })

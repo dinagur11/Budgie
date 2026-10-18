@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- the token is in the URL fragment: never sent to this server, and never passed on as a referrer -->
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex">
+  <title>Join a household on Budgie</title>
+  <style>
+    :root { --surface: #f7f9ff; --on-surface: #0d1d2b; --muted: #3d4943; --primary: #634eb0; --primary-soft: #e7deff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: var(--surface); color: var(--on-surface);
+           font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    header { background: var(--primary); color: #fff; padding: 40px 16px 56px; border-radius: 0 0 28px 28px; }
+    .wrap { max-width: 480px; margin: 0 auto; }
+    .wordmark { font-weight: 800; letter-spacing: -0.02em; text-align: right; opacity: 0.95; }
+    h1 { font-size: 28px; line-height: 1.2; margin: 24px 0 8px; }
+    header p { margin: 0; opacity: 0.85; }
+    main { padding: 0 16px 40px; margin-top: -28px; }
+    .card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 0 4px 20px rgba(13,29,43,0.08); }
+    .button { display: block; text-align: center; text-decoration: none; font-weight: 600; border-radius: 999px;
+              padding: 14px 20px; min-height: 48px; margin-top: 12px; }
+    .primary { background: var(--primary); color: #fff; }
+    .tonal { background: var(--primary-soft); color: var(--primary); }
+    .note { color: var(--muted); font-size: 14px; margin: 16px 0 0; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="wordmark">Budgie</div>
+      <h1>You're invited to a household</h1>
+      <p>Budgie keeps track of what your household spends, together.</p>
+    </div>
+  </header>
+  <main>
+    <div class="wrap card">
+      <div id="android" hidden>
+        <p style="margin:0">Get Budgie from Google Play, then tap the invite link again to see the household and join it.</p>
+        <a id="store" class="button primary" href="https://play.google.com/store/apps/details?id=com.budgie.mobile">Get Budgie on Google Play</a>
+        <a id="open" class="button tonal" href="#">I have Budgie: open the invite</a>
+      </div>
+      <div id="other" hidden>
+        <p style="margin:0">Budgie is an Android app. Open this link on your Android phone to join the household.</p>
+      </div>
+      <div id="invalid" hidden>
+        <p style="margin:0">This link is missing its invite. Ask the person who sent it for a new one.</p>
+      </div>
+      <p class="note">Each invite link works once and expires after 7 days.</p>
+    </div>
+  </main>
+  <script>
+    (function () {
+      var PACKAGE = "com.budgie.mobile";
+      var STORE = "https://play.google.com/store/apps/details?id=" + PACKAGE;
+      var match = /(?:^|[#&])token=([A-Za-z0-9_-]{1,128})(?:&|$)/.exec(location.hash);
+      var show = function (id) { document.getElementById(id).hidden = false; };
+      if (!match) { show("invalid"); return; }
+      if (!/Android/i.test(navigator.userAgent)) { show("other"); return; }
+      show("android");
+      // Android opens this page only when the app didn't take the link (not installed, or the link wasn't verified,
+      // as in some in-app browsers). The intent opens the app if it is installed, and Google Play otherwise.
+      var intent = "intent://join?token=" + match[1] + "#Intent;scheme=budgie;package=" + PACKAGE +
+        ";S.browser_fallback_url=" + encodeURIComponent(STORE) + ";end";
+      document.getElementById("open").href = intent;
+      location.replace(intent);
+    })();
+  </script>
+</body>
+</html>

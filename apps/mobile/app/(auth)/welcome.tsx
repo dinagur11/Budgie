@@ -4,7 +4,8 @@ import { Screen } from "../../src/components/Screen";
 import { Button } from "../../src/components/Button";
 import { Icon, type IconName } from "../../src/components/Icon";
 import { AuthTop, authTopText } from "../../src/components/AuthTop";
-import { colors } from "../../src/theme";
+import { usePendingInvite } from "../../src/invite/pendingInvite";
+import { colors, type as t } from "../../src/theme";
 
 // The signed-out home: what Budgie does (in the colored top section, like the signed-in home), and the way in.
 // Only features that exist today are listed.
@@ -17,6 +18,7 @@ const FEATURES: { icon: IconName; title: string; text: string }[] = [
 ];
 
 export default function WelcomeScreen() {
+  const invited = usePendingInvite() !== null;
   return (
     <Screen
       top={
@@ -34,6 +36,12 @@ export default function WelcomeScreen() {
       }
     >
       <View style={styles.actions}>
+        {invited && (
+          <View style={styles.invite}>
+            <Icon name="mail-outline" size={20} color={colors.secondary} />
+            <Text style={styles.inviteText}>You've been invited to a household. Create an account or log in to see the invite.</Text>
+          </View>
+        )}
         <Button label="Create an account" onPress={() => router.push("/register")} />
         <Button label="Log in" variant="tonal" onPress={() => router.push("/login")} />
       </View>
@@ -46,4 +54,6 @@ const styles = StyleSheet.create({
   badge: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" },
   featureText: { flex: 1, gap: 2 },
   actions: { gap: 10, marginTop: 8 },
+  invite: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 12, backgroundColor: colors.secondaryFixed },
+  inviteText: { ...t.bodySm, color: colors.onSurface, flex: 1 },
 });
