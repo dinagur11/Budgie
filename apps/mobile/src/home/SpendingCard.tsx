@@ -190,10 +190,11 @@ function ExpenseRow({ expense, categoryName, categoryColor: tagColor, payerName,
           <Icon name={expense.isRecurring ? "update" : "receipt-long"} size={14} color={expense.isRecurring ? colors.accent : colors.secondary} />
         </View>
         <View style={styles.rowText}>
-          <Text style={styles.rowName} numberOfLines={1}>{expense.name}</Text>
-          <View style={styles.rowMeta}>
+          {/* closed rows stay one line each; an open row shows the full name, category and payer, wrapping as needed */}
+          <Text style={styles.rowName} numberOfLines={open ? undefined : 1}>{expense.name}</Text>
+          <View style={[styles.rowMeta, open && styles.rowMetaOpen]}>
             <CategoryTag name={categoryName} color={tagColor} />
-            <Text style={styles.rowMetaText} numberOfLines={1}>
+            <Text style={styles.rowMetaText} numberOfLines={open ? undefined : 1}>
               {shortDateLabel(expense.date)} • Paid by <Text style={payerLeft && styles.departed}>{payerName}</Text>
             </Text>
           </View>
@@ -267,6 +268,7 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, minWidth: 0 },
   rowName: { fontFamily: fonts.jakarta700, fontSize: 12, lineHeight: 16, color: colors.onSurface },
   rowMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  rowMetaOpen: { flexWrap: "wrap" },
   rowMetaText: { flexShrink: 1, fontFamily: fonts.inter400, fontSize: 10, lineHeight: 14, color: colors.outline },
   departed: { color: colors.outlineVariant, fontStyle: "italic" },
   amount: { fontFamily: fonts.jakarta700, fontSize: 12, lineHeight: 16, color: colors.onSurface },
