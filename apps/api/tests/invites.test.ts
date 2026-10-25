@@ -163,7 +163,7 @@ describe("POST /households/join", () => {
 
     const res = await as(joiner).post("/households/join").send({ token });
     expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({ id: h.id, name: "Home", defaultCurrency: "USD", timeZone: "UTC", role: "MEMBER" });
+    expect(res.body).toStrictEqual({ id: h.id, name: "Home", defaultCurrency: "USD", timeZone: "UTC", monthlyLimit: null, role: "MEMBER" });
 
     expect(await membership(h.id, joiner.id)).toMatchObject({ role: "MEMBER", leftAt: null });
     const invite = await prisma.invite.findUnique({ where: { tokenHash: sha256(token) } });

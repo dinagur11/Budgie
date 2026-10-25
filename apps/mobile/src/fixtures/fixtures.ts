@@ -17,9 +17,9 @@ export function fixtureScenario(): Scenario {
 }
 
 const households: Household[] = [
-  { id: 1, name: "Cohen Family", defaultCurrency: "ILS", timeZone: "Asia/Jerusalem", role: "OWNER" },
-  { id: 2, name: "Beach House", defaultCurrency: "EUR", timeZone: "Europe/Berlin", role: "MEMBER" },
-  { id: 3, name: "Book Club", defaultCurrency: "USD", timeZone: "America/New_York", role: "OWNER" },
+  { id: 1, name: "Cohen Family", defaultCurrency: "ILS", timeZone: "Asia/Jerusalem", monthlyLimit: 800000, role: "OWNER" },
+  { id: 2, name: "Beach House", defaultCurrency: "EUR", timeZone: "Europe/Berlin", monthlyLimit: 20000, role: "MEMBER" },
+  { id: 3, name: "Book Club", defaultCurrency: "USD", timeZone: "America/New_York", monthlyLimit: null, role: "OWNER" },
 ];
 const members: Member[] = [
   { userId: 1, name: "Dana", role: "OWNER", joinedAt: "2026-01-04T09:12:00.000Z", isActive: true },
@@ -145,7 +145,7 @@ function mySpending(scenario: Scenario, requested?: string): MySpending {
 export function fixtureResponse(path: string, scenario: Scenario): unknown {
   const route = path.split("?")[0];
   const requestedMonth = /[?&]month=(\d{4}-\d{2})/.exec(path)?.[1];
-  if (route === "/me") return { id: 1, name: "Dana", email: "dana@example.com" } satisfies Me;
+  if (route === "/me") return { id: 1, name: "Dana", email: "dana@example.com", isPremium: true } satisfies Me;
   if (route === "/me/spending") return mySpending(scenario, requestedMonth);
   if (route === "/me/households")
     return scenario === "home" ? households.map((h): MyHousehold => ({ householdId: h.id, name: h.name, role: h.role })) : [];
@@ -153,7 +153,7 @@ export function fixtureResponse(path: string, scenario: Scenario): unknown {
   if (route === "/households/join/preview")
     return { householdName: "Beach House", members: [{ name: "Noa", role: "OWNER" }, { name: "Eli", role: "MEMBER" }] };
   if (route === "/households/join")
-    return { id: 99, name: "Beach House", defaultCurrency: "ILS", timeZone: "Asia/Jerusalem", role: "MEMBER" } satisfies Household;
+    return { id: 99, name: "Beach House", defaultCurrency: "ILS", timeZone: "Asia/Jerusalem", monthlyLimit: null, role: "MEMBER" } satisfies Household;
   const one = /^\/households\/(\d+)\/expenses\/(\d+)$/.exec(route);
   const rule = /^\/households\/(\d+)\/rules(?:\/(\d+))?$/.exec(route);
   if (rule) {

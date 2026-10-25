@@ -47,6 +47,12 @@ export function validateAmount(value: string): string | null {
   return parseAmount(value) === null ? "Enter an amount such as 12.50" : null;
 }
 
+// a household's monthly limit as typed: empty means no limit, otherwise the same rules as an amount
+export function validateLimit(value: string): string | null {
+  if (value.trim() === "") return null;
+  return parseAmount(value) === null ? "Enter an amount such as 3000, or leave it empty" : null;
+}
+
 // same rules as the backend's validDate plus "no future dates": a real YYYY-MM-DD day, years 2000 to 2100,
 // not after today (the household's today, passed in)
 export function validateExpenseDate(value: string, today: string): string | null {

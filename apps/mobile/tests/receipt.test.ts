@@ -68,6 +68,7 @@ describe("receiptErrorMessage", () => {
     expect(receiptErrorMessage(new ApiError(502, "Couldn't read the receipt"))).toBe("Couldn't read the receipt. Try again, or enter the expense manually.");
     expect(receiptErrorMessage(new ApiError(0, "x"))).toBe("Can't reach the server. Check your connection and try again.");
     expect(receiptErrorMessage(new ApiError(429, "Daily receipt limit reached"))).toBe("You've used today's 3 receipt scans. Enter the expense manually, or scan again tomorrow.");
+    expect(receiptErrorMessage(new ApiError(429, "Daily receipt limit reached"), true)).toBe("You've used today's 10 receipt scans. Enter the expense manually, or scan again tomorrow.");
     expect(receiptErrorMessage(new ApiError(404, "Receipt not found"))).toBe("Upload expired, try again.");
     expect(receiptErrorMessage(new ReceiptUploadError())).toBe("The photo couldn't be uploaded. Check your connection and try again.");
     expect(receiptErrorMessage(new ApiError(400, "Receipt image is too large"))).toBe("That photo is too large. Try another one.");

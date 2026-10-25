@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AppHeader, useBackToHouseholds } from "../../src/components/AppHeader";
 import { Card } from "../../src/components/Card";
 import { HouseholdSwitcher } from "../../src/components/HouseholdSwitcher";
@@ -5,14 +6,17 @@ import { Placeholder } from "../../src/components/Placeholder";
 import { Screen } from "../../src/components/Screen";
 import { ErrorView, LoadingView } from "../../src/components/StateViews";
 import { BreakdownCard } from "../../src/analytics/BreakdownCard";
+import { BudgetCard } from "../../src/analytics/BudgetCard";
 import { MonthlyCard } from "../../src/analytics/MonthlyCard";
 import { useHouseholdSelection } from "../../src/household/HouseholdContext";
 import { useCategories, useHousehold, useMembers } from "../../src/api/hooks";
+import type { Category, Household, Member } from "../../src/api/types";
 import { errorMessage } from "../../src/api/errors";
 import { monthOf, todayInTimeZone } from "../../src/lib/dates";
 
-// The selected household's analytics: one month's spending by category or payer (a donut), and the last months' totals
-// (bars). Both read existing endpoints (calendar and summary); months are the household's.
+// The selected household's analytics: the picked month's spending against the monthly limit (when there is one), that
+// month's spending by category or payer (a donut), and the last months' totals (bars). All read existing endpoints
+// (summary and calendar); months are the household's.
 export default function AnalyticsScreen() {
   const back = useBackToHouseholds();
   const { selectedId } = useHouseholdSelection();
@@ -42,8 +46,20 @@ export default function AnalyticsScreen() {
   return (
     <Screen inTabs header={header}>
       {/* keyed by household, so switching households starts over on its current month */}
-      <BreakdownCard key={`breakdown-${household.data.id}`} household={household.data} categories={categories.data} members={members.data} currentMonth={currentMonth} />
+      <MonthCards key={`month-${household.data.id}`} household={household.data} categories={categories.data} members={members.data} currentMonth={currentMonth} />
       <MonthlyCard key={`monthly-${household.data.id}`} household={household.data} currentMonth={currentMonth} />
     </Screen>
+  );
+}
+
+// the cards that follow the breakdown's month picker: the budget (only with a limit) and the breakdown
+function MonthCards({ household, categories, members, currentMonth }: { household: Household; categories: Category[]; members: Member[]; currentMonth: string }) {
+  const [month, setMonth] = useState(currentMonth);
+  const limit = household.monthlyLimit;
+  return (
+    <>
+      {limit !== null && <BudgetCard household={{ ...household, monthlyLimit: limit }} month={month} currentMonth={currentMonth} />}
+      <BreakdownCard household={household} categories={categories} members={members} month={month} currentMonth={currentMonth} onMonthChange={setMonth} />
+    </>
   );
 }

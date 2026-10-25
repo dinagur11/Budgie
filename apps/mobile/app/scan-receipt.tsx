@@ -8,6 +8,7 @@ import { Button } from "../src/components/Button";
 import { Icon } from "../src/components/Icon";
 import { useHouseholdSelection } from "../src/household/HouseholdContext";
 import { useReceiptScan } from "../src/api/receiptScan";
+import { useMe } from "../src/api/hooks";
 import { canRetryReceipt, receiptErrorMessage } from "../src/lib/receipt";
 import { colors, type as t } from "../src/theme";
 
@@ -20,6 +21,7 @@ type View_ = { kind: "choose"; note?: string } | { kind: "notReceipt" } | { kind
 export default function ScanReceiptScreen() {
   const { selectedId } = useHouseholdSelection();
   const { scan, stage, busy } = useReceiptScan(selectedId);
+  const me = useMe(); // the daily cap in the limit message depends on premium
   const [view, setView] = useState<View_>({ kind: "choose" });
   const [picking, setPicking] = useState(false);
   const lastSource = useRef<Source>("camera");
@@ -37,7 +39,7 @@ export default function ScanReceiptScreen() {
       }
       router.replace({ pathname: "/create-expense", params: { receipt: JSON.stringify(suggestion) } });
     } catch (err) {
-      setView({ kind: "error", message: receiptErrorMessage(err), retry: canRetryReceipt(err) });
+      setView({ kind: "error", message: receiptErrorMessage(err, me.data?.isPremium ?? false), retry: canRetryReceipt(err) });
     }
   }
 

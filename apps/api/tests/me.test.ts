@@ -6,7 +6,14 @@ describe("GET /me", () => {
     const user = await createUser("Dana");
     const res = await as(user).get("/me");
     expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({ id: user.id, name: "Dana", email: user.email });
+    expect(res.body).toStrictEqual({ id: user.id, name: "Dana", email: user.email, isPremium: false });
+  });
+
+  it("returns isPremium true for a premium user", async () => {
+    const user = await createUser("Dana");
+    await prisma.user.update({ where: { id: user.id }, data: { isPremium: true } });
+    const res = await as(user).get("/me");
+    expect(res.body).toStrictEqual({ id: user.id, name: "Dana", email: user.email, isPremium: true });
   });
 });
 
@@ -53,7 +60,7 @@ describe("PATCH /me", () => {
     const user = await createUser("Old");
     const res = await as(user).patch("/me").send({ name: "  New Name  ", email: "hacker@evil.com" });
     expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({ id: user.id, name: "New Name", email: user.email });
+    expect(res.body).toStrictEqual({ id: user.id, name: "New Name", email: user.email, isPremium: false });
     const db = await prisma.user.findUnique({ where: { id: user.id } });
     expect(db).toMatchObject({ name: "New Name", email: user.email, cognitoId: user.cognitoId });
   });
@@ -85,7 +92,7 @@ describe("PATCH /me", () => {
       expect(res.status).toBe(400);
       expect(res.body).toStrictEqual({ error: expect.any(String) });
       const db = await prisma.user.findUnique({ where: { id: user.id } });
-      expect(db).toMatchObject({ name: "Keep", email: user.email });
+      expect(db).toMatchObject({ name: "Keep", email: user.email, isPremium: false });
     });
   }
 });

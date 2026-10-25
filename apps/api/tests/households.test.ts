@@ -12,7 +12,7 @@ describe("POST /households", () => {
     const res = await as(user).post("/households").send(valid);
     expect(res.status).toBe(201);
     expect(res.body).toStrictEqual({
-      id: expect.any(Number), name: "Our flat", defaultCurrency: "ILS", timeZone: "Asia/Jerusalem", role: "OWNER",
+      id: expect.any(Number), name: "Our flat", defaultCurrency: "ILS", timeZone: "Asia/Jerusalem", monthlyLimit: null, role: "OWNER",
     });
     const m = await prisma.householdMember.findUnique({
       where: { userId_householdId: { userId: user.id, householdId: res.body.id } },
@@ -28,6 +28,31 @@ describe("POST /households", () => {
     expect(res.body.name).toBe("Home");
     expect(res.body.timeZone).toBe("Asia/Jerusalem");
   });
+
+  it("stores an optional monthlyLimit; missing or null means none", async () => {
+    const user = await createUser();
+    let res = await as(user).post("/households").send({ ...valid, monthlyLimit: 300000 });
+    expect(res.status).toBe(201);
+    expect(res.body.monthlyLimit).toBe(300000);
+    expect((await prisma.household.findUnique({ where: { id: res.body.id } }))?.monthlyLimit).toBe(300000);
+
+    res = await as(user).post("/households").send({ ...valid, monthlyLimit: null });
+    expect(res.status).toBe(201);
+    expect(res.body.monthlyLimit).toBeNull();
+
+    res = await as(user).post("/households").send({ ...valid, monthlyLimit: 2147483647 });
+    expect(res.body.monthlyLimit).toBe(2147483647);
+  });
+
+  for (const monthlyLimit of [0, -1, 1.5, 2147483648, "100", true, {}, []]) {
+    it(`returns 400 for monthlyLimit ${JSON.stringify(monthlyLimit)} and creates nothing`, async () => {
+      const user = await createUser();
+      const res = await as(user).post("/households").send({ ...valid, monthlyLimit });
+      expect(res.status).toBe(400);
+      expect(res.body).toStrictEqual({ error: "monthlyLimit must be a positive whole number or null" });
+      expect(await prisma.householdMember.count({ where: { userId: user.id } })).toBe(0);
+    });
+  }
 
   it("accepts a 100-character name", async () => {
     const user = await createUser();
@@ -78,10 +103,10 @@ describe("GET /households/:id", () => {
 
     const res = await as(owner).get(`/households/${h.id}`);
     expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({ id: h.id, name: "Home", defaultCurrency: "USD", timeZone: "UTC", role: "OWNER" });
+    expect(res.body).toStrictEqual({ id: h.id, name: "Home", defaultCurrency: "USD", timeZone: "UTC", monthlyLimit: null, role: "OWNER" });
 
     const res2 = await as(member).get(`/households/${h.id}`);
-    expect(res2.body).toStrictEqual({ id: h.id, name: "Home", defaultCurrency: "USD", timeZone: "UTC", role: "MEMBER" });
+    expect(res2.body).toStrictEqual({ id: h.id, name: "Home", defaultCurrency: "USD", timeZone: "UTC", monthlyLimit: null, role: "MEMBER" });
   });
 
   it("returns 404 for a non-member, a former member and a missing household", async () => {
@@ -110,23 +135,50 @@ describe("PATCH /households/:id", () => {
     const { owner, h } = await setup();
     let res = await as(owner).patch(`/households/${h.id}`).send({ name: " New " });
     expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({ id: h.id, name: "New", defaultCurrency: "USD", timeZone: "UTC", role: "OWNER" });
+    expect(res.body).toStrictEqual({ id: h.id, name: "New", defaultCurrency: "USD", timeZone: "UTC", monthlyLimit: null, role: "OWNER" });
 
     res = await as(owner).patch(`/households/${h.id}`).send({ defaultCurrency: "EUR" });
-    expect(res.body).toStrictEqual({ id: h.id, name: "New", defaultCurrency: "EUR", timeZone: "UTC", role: "OWNER" });
+    expect(res.body).toStrictEqual({ id: h.id, name: "New", defaultCurrency: "EUR", timeZone: "UTC", monthlyLimit: null, role: "OWNER" });
 
     res = await as(owner).patch(`/households/${h.id}`).send({ timeZone: "Europe/Berlin" });
-    expect(res.body).toStrictEqual({ id: h.id, name: "New", defaultCurrency: "EUR", timeZone: "Europe/Berlin", role: "OWNER" });
+    expect(res.body).toStrictEqual({ id: h.id, name: "New", defaultCurrency: "EUR", timeZone: "Europe/Berlin", monthlyLimit: null, role: "OWNER" });
 
     const db = await prisma.household.findUnique({ where: { id: h.id } });
     expect(db).toMatchObject({ name: "New", defaultCurrency: "EUR", timeZone: "Europe/Berlin" });
+  });
+
+  it("sets, changes and removes the monthlyLimit", async () => {
+    const { owner, member, h } = await setup();
+    let res = await as(owner).patch(`/households/${h.id}`).send({ monthlyLimit: 50000 });
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ id: h.id, name: "Home", defaultCurrency: "USD", timeZone: "UTC", monthlyLimit: 50000, role: "OWNER" });
+    expect((await as(member).get(`/households/${h.id}`)).body.monthlyLimit).toBe(50000);
+
+    res = await as(owner).patch(`/households/${h.id}`).send({ monthlyLimit: 75000 });
+    expect(res.body.monthlyLimit).toBe(75000);
+
+    // a currency change keeps the number as it is
+    res = await as(owner).patch(`/households/${h.id}`).send({ defaultCurrency: "EUR" });
+    expect(res.body.monthlyLimit).toBe(75000);
+
+    res = await as(owner).patch(`/households/${h.id}`).send({ monthlyLimit: null });
+    expect(res.status).toBe(200);
+    expect(res.body.monthlyLimit).toBeNull();
+    expect((await prisma.household.findUnique({ where: { id: h.id } }))?.monthlyLimit).toBeNull();
+  });
+
+  it("returns 403 when a MEMBER changes the monthlyLimit", async () => {
+    const { member, h } = await setup();
+    const res = await as(member).patch(`/households/${h.id}`).send({ monthlyLimit: 100 });
+    expect(res.status).toBe(403);
+    expect((await prisma.household.findUnique({ where: { id: h.id } }))?.monthlyLimit).toBeNull();
   });
 
   it("updates all fields at once", async () => {
     const { owner, h } = await setup();
     const res = await as(owner).patch(`/households/${h.id}`).send(valid);
     expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({ id: h.id, ...valid, role: "OWNER" });
+    expect(res.body).toStrictEqual({ id: h.id, ...valid, monthlyLimit: null, role: "OWNER" });
   });
 
   it("returns 400 'Nothing to update' for an empty body or only unknown fields", async () => {
@@ -148,6 +200,10 @@ describe("PATCH /households/:id", () => {
     ["unknown currency", { defaultCurrency: "XYZ" }],
     ["null currency", { defaultCurrency: null }],
     ["invalid time zone", { timeZone: "Not/AZone" }],
+    ["zero monthlyLimit", { monthlyLimit: 0 }],
+    ["fractional monthlyLimit", { monthlyLimit: 10.5 }],
+    ["string monthlyLimit", { monthlyLimit: "500" }],
+    ["valid name but invalid monthlyLimit", { name: "Ok", monthlyLimit: -5 }],
     ["valid name but invalid currency", { name: "Ok", defaultCurrency: "nope" }],
   ];
   for (const [label, body] of bad) {

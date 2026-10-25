@@ -34,9 +34,12 @@ const s3 = new S3Client({ region: config.awsRegion, requestChecksumCalculation: 
 
 const UPLOAD_URL_TTL_SECONDS = 300;
 
-// analyses per user per day (the scanning household's local date), across all their households
+// analyses per user per day (the scanning household's local date), across all their households; premium users get more
 export const MAX_RECEIPTS_PER_DAY = 3;
+export const MAX_RECEIPTS_PER_DAY_PREMIUM = 10;
 const LIMIT_MESSAGE = "Daily receipt limit reached";
+
+const dailyCap = (isPremium: boolean) => (isPremium ? MAX_RECEIPTS_PER_DAY_PREMIUM : MAX_RECEIPTS_PER_DAY);
 
 async function scansToday(userId: number, today: string, tx: Prisma.TransactionClient = prisma) {
   return tx.receiptScan.count({ where: { userId, day: new Date(today) } });
@@ -46,15 +49,17 @@ async function scansToday(userId: number, today: string, tx: Prisma.TransactionC
 async function assertScansLeft(userId: number, householdId: number) {
   const household = await prisma.household.findUnique({ where: { id: householdId }, select: { timeZone: true } });
   if (!household) throw new HttpError(404, "Household not found");
-  if (await scansToday(userId, todayInTimeZone(household.timeZone)) >= MAX_RECEIPTS_PER_DAY)
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { isPremium: true } });
+  if (await scansToday(userId, todayInTimeZone(household.timeZone)) >= dailyCap(user.isPremium))
     throw new HttpError(429, LIMIT_MESSAGE);
 }
 
-// Records one analysis before the LLM call. Locks the user row so two concurrent analyses can't both take the last scan.
+// Records one analysis before the LLM call. Locks the user row so two concurrent analyses can't both take the last scan;
+// the premium flag is read under the same lock.
 async function reserveScan(userId: number, today: string) {
   await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
-    if (await scansToday(userId, today, tx) >= MAX_RECEIPTS_PER_DAY) throw new HttpError(429, LIMIT_MESSAGE);
+    const [user] = await tx.$queryRaw<{ isPremium: boolean }[]>`SELECT "isPremium" FROM "User" WHERE id = ${userId} FOR UPDATE`;
+    if (await scansToday(userId, today, tx) >= dailyCap(user.isPremium)) throw new HttpError(429, LIMIT_MESSAGE);
     await tx.receiptScan.create({ data: { userId, day: new Date(today) } });
   });
 }

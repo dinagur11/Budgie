@@ -5,7 +5,7 @@ import { HttpError } from "../middleware/errorHandler.js";
 
 export const meRouter = Router();
 
-//get user id, name, email
+//get user id, name, email, isPremium
 meRouter.get("/", async (req, res) => {
     const userId:number = req.user!.id;
     const user = await getUserData(userId);

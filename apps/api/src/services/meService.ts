@@ -6,7 +6,7 @@ import { generateDueExpenses } from "./recurringRulesService.js";
 export async function getUserData(userId: number){
     return prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true, email: true, isPremium: true },
     });
 } 
 
@@ -28,7 +28,7 @@ export async function updateName(userId: number, newName: string){
     return prisma.user.update({
         where: { id: userId },
         data: { name: newName},
-        select: { id: true, name: true, email: true }
+        select: { id: true, name: true, email: true, isPremium: true }
     });
 }
 

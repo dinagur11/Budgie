@@ -63,6 +63,7 @@ model User{
     cognitoId String @unique
     name String
     email String @unique
+    isPremium Boolean @default(false) // more receipt scans per day, and (later) spending Q&A
     createdAt DateTime @default(now())
     paidExpenses Expense[] @relation("PaidExpenses")
     createdExpenses Expense[] @relation("CreatedExpenses")
@@ -81,6 +82,7 @@ model Household{
     expenses Expense[]
     defaultCurrency Currency @default(USD)
     timeZone String @default("UTC") // IANA zone name; decides "today" for recurring rules
+    monthlyLimit Int? // optional monthly budget in minor units of defaultCurrency; null means none
     recurringRules RecurringRule[]
     invites Invite[]
 

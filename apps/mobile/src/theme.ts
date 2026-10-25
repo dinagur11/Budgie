@@ -24,6 +24,7 @@ export const colors = {
   error: "#ba1a1a",
   errorContainer: "#ffdad6",
   onErrorContainer: "#93000a",
+  warning: "#b25e00", // amber: the budget bar from 80% of the limit
   accent: "#2563eb", // wordmark, active nav icon
   accentRing: "#3b82f6", // avatar ring, calendar dots
   accentSoft: "#dbeafe", // active nav background, avatar

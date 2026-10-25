@@ -6,19 +6,22 @@ export type HouseholdUpdate = {
   name?: string;
   defaultCurrency?: Currency;
   timeZone?: string;
+  monthlyLimit?: number | null;
 }; 
 
-export async function createHousehold(name: string, currency: Currency, timeZone: string, userId: number){
+const householdSelect = { id: true, name: true, defaultCurrency: true, timeZone: true, monthlyLimit: true } as const;
+
+export async function createHousehold(name: string, currency: Currency, timeZone: string, monthlyLimit: number | null, userId: number){
     return prisma.household.create({
-        data: { name, defaultCurrency: currency, timeZone, members: { create: { userId, role: "OWNER" } } },
-        select: { id: true, name: true, defaultCurrency: true, timeZone: true },
+        data: { name, defaultCurrency: currency, timeZone, monthlyLimit, members: { create: { userId, role: "OWNER" } } },
+        select: householdSelect,
     });
 }
 
 export async function getHouseholdData(householdId: number) {
     return prisma.household.findUnique({
         where: { id: householdId },
-        select: { id: true, name: true, defaultCurrency: true, timeZone: true },
+        select: householdSelect,
     });
 } 
 
@@ -26,7 +29,7 @@ export async function updateHousehold(householdId: number, dataToUpdate: Househo
     return prisma.household.update({
         where: { id: householdId },
         data: dataToUpdate,
-        select: { id: true, name: true, defaultCurrency: true, timeZone: true },
+        select: householdSelect,
     })
 }
 

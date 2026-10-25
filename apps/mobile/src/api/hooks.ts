@@ -106,7 +106,7 @@ export function useMonthExpenses(id: number | null, month: string | null) {
 export function useCreateHousehold() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; defaultCurrency: Currency; timeZone: string }) =>
+    mutationFn: (body: { name: string; defaultCurrency: Currency; timeZone: string; monthlyLimit: number | null }) =>
       apiFetch<Household>("/households", { method: "POST", body }),
     onSuccess: async (household) => {
       queryClient.setQueryData(keys.household(household.id), household);
@@ -115,7 +115,8 @@ export function useCreateHousehold() {
   });
 }
 
-export type HouseholdUpdate = Partial<{ name: string; defaultCurrency: Currency; timeZone: string }>;
+// monthlyLimit null removes the limit
+export type HouseholdUpdate = Partial<{ name: string; defaultCurrency: Currency; timeZone: string; monthlyLimit: number | null }>;
 
 // owner only; the switcher and the list read the name from GET /me/households, so that is refreshed too
 export function useUpdateHousehold(id: number) {

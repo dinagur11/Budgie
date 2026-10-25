@@ -76,6 +76,14 @@ export function validAmount(value: unknown): number {
   return value;
 }
 
+// a household's monthly budget: minor units of its defaultCurrency (1 to 2147483647), or null for no limit
+export function validMonthlyLimit(value: unknown): number | null {
+  if (value === null) return null;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > MAX_INT)
+    throw new HttpError(400, "monthlyLimit must be a positive whole number or null");
+  return value;
+}
+
 export function validDate(value: unknown): Date {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new HttpError(400, "Date must be in YYYY-MM-DD format");

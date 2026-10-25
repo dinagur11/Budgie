@@ -10,14 +10,15 @@ Budgie is a mobile app for tracking a household's expenses together. Everyone in
     <td align="center"><img src="docs/screenshots/create-expense.png" width="220" alt="Create expense form"><br><sub>Create expense</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/analytics.png" width="220" alt="Analytics: spending breakdown and spending by month"><br><sub>Analytics</sub></td>
-    <td align="center"><img src="docs/screenshots/profile.png" width="220" alt="Profile: what you paid in each household"><br><sub>Profile</sub></td>
+    <td align="center"><img src="docs/screenshots/analytics.png" width="220" alt="Analytics: the month's budget, spending breakdown and spending by month"><br><sub>Analytics and budget</sub></td>
+    <td align="center"><img src="docs/screenshots/profile.png" width="220" alt="Profile: what you paid in each household, with the Premium badge"><br><sub>Profile</sub></td>
     <td align="center"><img src="docs/screenshots/members.png" width="220" alt="Members and invites"><br><sub>Members</sub></td>
-    <td align="center"><img src="docs/screenshots/household-settings.png" width="220" alt="Household settings and categories"><br><sub>Household settings</sub></td>
+    <td align="center"><img src="docs/screenshots/household-settings.png" width="220" alt="Household settings: name, currency, time zone and monthly limit"><br><sub>Household settings</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="docs/screenshots/scan-receipt.png" width="220" alt="Photograph a receipt: take a photo or choose one from the gallery"><br><sub>Photograph a receipt</sub></td>
     <td align="center"><img src="docs/screenshots/receipt-expense.png" width="220" alt="The create expense form filled in from a receipt"><br><sub>Filled in from the receipt</sub></td>
+    <td align="center"><img src="docs/screenshots/ask-ai.png" width="220" alt="Ask AI: coming soon"><br><sub>Ask AI (coming soon)</sub></td>
   </tr>
 </table>
 
@@ -25,19 +26,21 @@ Budgie is a mobile app for tracking a household's expenses together. Everyone in
 
 ## Features
 
-- **Households.** Create a household with a default currency and a time zone, and share it with others. Each person can belong to several households.
-- **Members and invites.** Owners create single-use invite links that expire after 7 days, remove members and manage the household. Members can leave, and if the last owner leaves, another member becomes owner.
+- **Households.** Create a household with a default currency, a time zone and an optional monthly limit, and share it with others. Each person can belong to several households.
+- **Members and invites.** Owners create single-use invite links that expire after 7 days (tapping one opens the app, or the Play Store if it isn't installed), remove members and manage the household. Members can leave, and if the last owner leaves, another member becomes owner.
 - **Expenses.** Log an expense with its amount, currency, date (picked on a calendar), category, payer and an optional description. The payer, the creator or an owner can edit or remove it. Expenses can't be dated in the future.
 - **Photograph receipts.** Take a photo of a receipt or pick one from the gallery. Budgie reads the store, total, currency, date, items and a likely category, and opens the expense form filled in for you to check before saving. The photo is shrunk on the phone, uploaded straight to private storage and deleted as soon as it has been read.
 - **Recurring expenses.** Daily, weekly, every two weeks, monthly or yearly, with an optional end date. Past occurrences are filled in when one is created. Upcoming ones appear on the calendar but aren't counted as spent until they're due.
 - **Month view.** Each household's month has the total spent, what's still scheduled, the expense list (filter by category or payer), the recurring expenses and a calendar with category-colored dots. Arrows step back through earlier months.
 - **Categories.** Built-in categories, plus each household's own, which can be renamed, archived or deleted.
+- **Monthly budget.** An optional monthly limit in the household's default currency, which owners set, change or remove. The Analytics tab shows how much of it the month's expenses used, as an amount and a percentage that can pass 100%, on a bar that turns amber from 80% and red once the limit is passed. Only expenses in the default currency count.
 - **Analytics.** A month's spending by category or payer as a donut chart, and the household's total for each of the last 6 months.
 - **Profile.** What you paid in each of your households, month by month.
 - **Multiple currencies.** Amounts are kept per currency and never converted or added across currencies.
-- **Accounts.** Sign up with email and a confirmation code (AWS Cognito), change your name and password, and log out.
+- **Accounts.** Sign up with email and a confirmation code (AWS Cognito), reset a forgotten password, change your name and password, and log out.
+- **Premium.** Premium accounts get 10 receipt scans a day instead of 3, and a Premium badge on their profile. Premium is set in the database for now; there is no way to upgrade in the app yet.
 
-Coming next: questions about your spending in plain English, monthly reports, joining a household from an invite link inside the app, an optional monthly spending limit for a household, and notifications for the household.
+Coming next: questions about your spending in plain English (the Ask AI tab, a premium feature; it shows a coming-soon screen for now), monthly reports, notifications for the household, and a way to become premium.
 
 ## Tech stack
 

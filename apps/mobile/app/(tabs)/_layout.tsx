@@ -8,6 +8,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="(home)" />
       <Tabs.Screen name="members" />
       <Tabs.Screen name="analytics" />
+      <Tabs.Screen name="ask-ai" />
       <Tabs.Screen name="settings" />
     </Tabs>
   );

@@ -88,6 +88,16 @@ describe("POST /households/:id/receipts/analyze, daily cap", () => {
     expect(await prisma.receiptScan.count({ where: { userId: user.id } })).toBe(2);
   });
 
+  it("a premium user gets 10 analyses a day, also under concurrency", async () => {
+    const { user, h } = await setup();
+    await prisma.user.update({ where: { id: user.id }, data: { isPremium: true } });
+    const keys = Array.from({ length: 12 }, () => putImage(h.id));
+    const statuses = (await Promise.all(keys.map((k) => analyze(user, h.id, k)))).map((r) => r.status);
+    expect(statuses.filter((s) => s === 200)).toHaveLength(10);
+    expect(statuses.filter((s) => s === 429)).toHaveLength(2);
+    expect(await prisma.receiptScan.count({ where: { userId: user.id } })).toBe(10);
+  });
+
   it("concurrent analyses: exactly 3 succeed, the rest are 429 (never 500)", async () => {
     const { user, h } = await setup();
     const keys = Array.from({ length: 6 }, () => putImage(h.id));

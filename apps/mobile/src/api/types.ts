@@ -7,7 +7,7 @@ export type Currency = (typeof CURRENCIES)[number];
 
 export type Role = "OWNER" | "MEMBER";
 
-export type Me = { id: number; name: string; email: string };
+export type Me = { id: number; name: string; email: string; isPremium: boolean };
 
 // GET /me/spending?month=YYYY-MM: what the caller paid, per currency (alphabetical), across their active households,
 // and the same per household (every active household, in the order of GET /me/households, totals [] when nothing)
@@ -22,7 +22,8 @@ export type MySpending = {
 export type MyHousehold = { householdId: number; name: string; role: Role };
 
 // GET /households/:id, POST /households
-export type Household = { id: number; name: string; defaultCurrency: Currency; timeZone: string; role: Role };
+// monthlyLimit: the optional monthly budget in minor units of defaultCurrency, null when there is none
+export type Household = { id: number; name: string; defaultCurrency: Currency; timeZone: string; monthlyLimit: number | null; role: Role };
 
 // GET /households/:id/members?includeFormer=true
 // joinedAt is an ISO timestamp (reset when a former member rejoins)

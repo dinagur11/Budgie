@@ -17,12 +17,12 @@ import { colors, type as t } from "../theme";
 // "Other" is a neutral gray, never one of the category colors
 const OTHER_COLOR = colors.outline;
 
-type Props = { household: Household; categories: Category[]; members: Member[]; currentMonth: string };
+// the month is the analytics screen's, so the budget card follows the same picker
+type Props = { household: Household; categories: Category[]; members: Member[]; month: string; currentMonth: string; onMonthChange: (month: string) => void };
 
 // A donut of one month's real expenses (no projections), by category or by payer, in one currency at a time (DonutChart).
-export function BreakdownCard({ household, categories, members, currentMonth }: Props) {
+export function BreakdownCard({ household, categories, members, month, currentMonth, onMonthChange }: Props) {
   const [by, setBy] = useState<GroupBy>("category");
-  const [month, setMonth] = useState(currentMonth);
   const [chosenCurrency, setChosenCurrency] = useState<Currency | null>(null);
   const calendar = useCalendarMonth(household.id, month);
 
@@ -51,7 +51,7 @@ export function BreakdownCard({ household, categories, members, currentMonth }: 
           <Chip label="Payer" active={by === "payer"} onPress={() => setBy("payer")} />
         </View>
       </Field>
-      <MonthNav month={month} current={currentMonth} onChange={setMonth} />
+      <MonthNav month={month} current={currentMonth} onChange={onMonthChange} />
       {currencies.length > 1 && (
         <Field label="Currency">
           <View style={styles.chips} accessibilityRole="radiogroup">

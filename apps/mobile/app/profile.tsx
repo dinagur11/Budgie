@@ -36,7 +36,15 @@ export default function ProfileScreen() {
   return (
     <Screen header={<AppHeader onBack={back} backLabel="Back" />}>
       <View style={styles.heading}>
-        <Text style={styles.title}>{me.data ? me.data.name : "Profile"}</Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.title}>{me.data ? me.data.name : "Profile"}</Text>
+          {me.data?.isPremium && (
+            <View style={styles.premium} accessibilityLabel="Premium account">
+              <Icon name="workspace-premium" size={14} color={colors.onSecondary} />
+              <Text style={styles.premiumText}>Premium</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.subtitle}>What you paid, in every household you're in.</Text>
       </View>
       <MonthNav month={month} current={currentMonth} onChange={setMonth} />
@@ -160,6 +168,9 @@ function ByHouseholdCard({ spending }: { spending: MySpending }) {
 
 const styles = StyleSheet.create({
   heading: { gap: 2, marginTop: 8 },
+  nameRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
+  premium: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.secondary, borderRadius: radii.pill, paddingHorizontal: 10, paddingVertical: 3 },
+  premiumText: { ...t.labelMd, color: colors.onSecondary },
   title: { ...t.headlineMd, color: colors.onSurface },
   subtitle: { ...t.bodyMd, color: colors.onSurfaceVariant },
   card: { padding: 16, gap: 12 },

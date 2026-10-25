@@ -12,6 +12,7 @@ const TABS: Record<string, { label: string; icon: IconName | { outline: OutlineI
   "(home)": { label: "Expenses", icon: "payments" },
   members: { label: "Members", icon: "diversity-1" },
   analytics: { label: "Analytics", icon: { outline: "chart-pie-outline" } },
+  "ask-ai": { label: "Ask AI", icon: "auto-awesome" },
   settings: { label: "Settings", icon: { outline: "cog-outline" } },
 };
 

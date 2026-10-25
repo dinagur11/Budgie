@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { HttpError } from "../middleware/errorHandler.js";
 import { requireMember, requireOwner } from "../middleware/household.js";
-import { validName, validCurrency, validTimeZone, validId, optional, validBoolean, validAmount, validDate, validDescription, validFrequency, validMonth, validReceiptKey, validReceiptContentType, validReceiptSize } from "../lib/validate.js";
+import { validName, validCurrency, validTimeZone, validId, optional, validBoolean, validAmount, validDate, validDescription, validFrequency, validMonth, validReceiptKey, validReceiptContentType, validReceiptSize, validMonthlyLimit } from "../lib/validate.js";
 import { createHousehold, updateHousehold, leaveHousehold, removeMember, deleteHousehold, getMembers, getHouseholdData} from "../services/householdsService.js"
 import { createInvite, previewInvite, acceptInvite, listInvites, cancelInvite } from "../services/invitesService.js";
 import { createCategory, deleteCategory, updateCategory, getAllCategories } from "../services/categoriesService.js"
@@ -14,14 +14,15 @@ import { analyzeReceipt, createReceiptUpload } from "../services/receiptsService
 
 export const householdsRouter = Router();
 
-//create an household: all fields mandatory
+//create an household: name, currency and time-zone mandatory; monthlyLimit optional (missing or null means none)
 householdsRouter.post("/", async (req, res) => {
     const userId = req.user!.id;
-    const { name, defaultCurrency, timeZone } = req.body ?? {};
+    const { name, defaultCurrency, timeZone, monthlyLimit } = req.body ?? {};
     const validatedName = validName(name);
     const validatedCurrency = validCurrency(defaultCurrency);
     const validatedZone = validTimeZone(timeZone);
-    const household = await createHousehold(validatedName, validatedCurrency, validatedZone, userId);
+    const validatedLimit = optional(monthlyLimit, validMonthlyLimit) ?? null;
+    const household = await createHousehold(validatedName, validatedCurrency, validatedZone, validatedLimit, userId);
     return res.status(201).json({ ...household, role: "OWNER" });
 })
 
@@ -34,14 +35,15 @@ householdsRouter.get("/:id", requireMember, async (req, res) => {
     return res.status(200).json({ ...household, role: req.membership!.role });
 })
 
-//update an household (name, currency or time-zone)
+//update an household (name, currency, time-zone or monthlyLimit; monthlyLimit null removes the limit)
 householdsRouter.patch("/:id", requireMember, requireOwner, async (req, res) => {
     const householdId:number = req.membership!.householdId;
-    const { name, defaultCurrency, timeZone } = req.body ?? {};
+    const { name, defaultCurrency, timeZone, monthlyLimit } = req.body ?? {};
     const data = {
         name: optional(name, validName),
         defaultCurrency: optional(defaultCurrency, validCurrency),
         timeZone: optional(timeZone, validTimeZone),
+        monthlyLimit: optional(monthlyLimit, validMonthlyLimit),
     };
 
     if (Object.values(data).every((v) => v === undefined)) {

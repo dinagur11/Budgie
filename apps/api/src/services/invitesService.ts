@@ -132,7 +132,7 @@ export async function acceptInvite(token: string, userId: number) {
 
         const household = await tx.household.findUnique({
             where: { id: householdId },
-            select: { id: true, name: true, defaultCurrency: true, timeZone: true },
+            select: { id: true, name: true, defaultCurrency: true, timeZone: true, monthlyLimit: true },
         });
         return { ...household!, role: "MEMBER" as const };
     });
