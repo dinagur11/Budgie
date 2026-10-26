@@ -18,7 +18,8 @@ Budgie is a mobile app for tracking a household's expenses together. Everyone in
   <tr>
     <td align="center"><img src="docs/screenshots/scan-receipt.png" width="220" alt="Photograph a receipt: take a photo or choose one from the gallery"><br><sub>Photograph a receipt</sub></td>
     <td align="center"><img src="docs/screenshots/receipt-expense.png" width="220" alt="The create expense form filled in from a receipt"><br><sub>Filled in from the receipt</sub></td>
-    <td align="center"><img src="docs/screenshots/ask-ai.png" width="220" alt="Ask AI: coming soon"><br><sub>Ask AI (coming soon)</sub></td>
+    <td align="center"><img src="docs/screenshots/ask-ai-start.png" width="220" alt="Ask AI: example questions to start a chat"><br><sub>Ask AI</sub></td>
+    <td align="center"><img src="docs/screenshots/ask-ai.png" width="220" alt="Ask AI: a question about groceries and its answer"><br><sub>Ask AI answering</sub></td>
   </tr>
 </table>
 
@@ -38,9 +39,10 @@ Budgie is a mobile app for tracking a household's expenses together. Everyone in
 - **Profile.** What you paid in each of your households, month by month.
 - **Multiple currencies.** Amounts are kept per currency and never converted or added across currencies.
 - **Accounts.** Sign up with email and a confirmation code (AWS Cognito), reset a forgotten password, change your name and password, and log out.
-- **Premium.** Premium accounts get 10 receipt scans a day instead of 3, and a Premium badge on their profile. Premium is set in the database for now; there is no way to upgrade in the app yet.
+- **Ask AI.** Ask about the household's spending in plain English: "How much did I spend on groceries last month?", "Where do we spend the most?", "What do our recurring expenses cost per month?". Follow-ups such as "and in March?" keep the context. The model never sees the database: it picks from a fixed set of queries (totals, monthly averages, biggest expenses, top categories, peak month, recurring costs, last purchase), and every number in the answer comes from those queries, per currency and only for your household. Premium only, up to 20 questions an hour.
+- **Premium.** Premium accounts can use Ask AI, get 10 receipt scans a day instead of 3, and have a Premium badge on their profile. Others see an invitation to join instead of the chat. Premium is set in the database for now; there is no way to upgrade in the app yet.
 
-Coming next: questions about your spending in plain English (the Ask AI tab, a premium feature; it shows a coming-soon screen for now), monthly reports, notifications for the household, and a way to become premium.
+Coming next: monthly reports, notifications for the household, and a way to become premium.
 
 ## Tech stack
 
@@ -51,6 +53,7 @@ Coming next: questions about your spending in plain English (the Ask AI tab, a p
 | Database | PostgreSQL 16 with Prisma 7 (`pg` driver adapter) |
 | Auth | AWS Cognito (the app's own sign-in screens; the API verifies ID tokens) |
 | Receipts | AWS S3 (presigned uploads, images deleted after reading), the OpenAI API (reads the receipt), `expo-image-picker` and `expo-image-manipulator` on the phone |
+| Ask AI | The OpenAI Responses API with function calling over predefined, household-scoped SQL queries (Prisma `$queryRaw`) |
 | Tests | Vitest (with Supertest against a real Postgres database for the API) |
 
 ## Repository layout
@@ -73,7 +76,7 @@ The two apps are separate npm projects with no workspaces. Run each one's comman
 - Node.js and npm
 - Docker, for the local database
 - An AWS Cognito user pool with an app client that has no client secret and has self-registration turned on
-- For receipts: an S3 bucket (with a lifecycle rule that expires leftover `receipts/` images), AWS credentials allowed `s3:PutObject`, `s3:GetObject` and `s3:DeleteObject` on `receipts/*` and `s3:ListBucket` on the bucket, and an OpenAI API key
+- For receipts: an S3 bucket (with a lifecycle rule that expires leftover `receipts/` images), AWS credentials allowed `s3:PutObject`, `s3:GetObject` and `s3:DeleteObject` on `receipts/*` and `s3:ListBucket` on the bucket, and an OpenAI API key (also used by Ask AI)
 - For the app: Xcode (iOS) or Android Studio with an emulator. The app uses native modules, so it runs as an Expo development build, not in Expo Go.
 
 ### Database
@@ -95,7 +98,7 @@ npm run db:seed         # the built-in categories
 npm run dev             # http://localhost:3000 (or PORT)
 ```
 
-`.env` needs `DATABASE_URL`, `AWS_REGION`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `S3_BUCKET`, `OPENAI_API_KEY`, `OPENAI_RECEIPT_MODEL` and optionally `PORT`. AWS credentials come from the usual AWS SDK sources (environment, profile or role); on Railway, which has no AWS role, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. A second Railway service runs the daily invite cleanup (`node dist/src/jobs/cleanupInvites.js` on the cron schedule `0 3 * * *`) and needs only `DATABASE_URL`. Railway settings are kept in the dashboard, not in config files. Never commit it.
+`.env` needs `DATABASE_URL`, `AWS_REGION`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `S3_BUCKET`, `OPENAI_API_KEY`, `OPENAI_RECEIPT_MODEL`, `OPENAI_ASK_MODEL` (the model for Ask AI, `gpt-5.4-mini`) and optionally `PORT`. AWS credentials come from the usual AWS SDK sources (environment, profile or role); on Railway, which has no AWS role, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. A second Railway service runs the daily invite cleanup (`node dist/src/jobs/cleanupInvites.js` on the cron schedule `0 3 * * *`) and needs only `DATABASE_URL`. Railway settings are kept in the dashboard, not in config files. Never commit it.
 
 ### Mobile app (`apps/mobile`)
 
@@ -124,7 +127,7 @@ npx vitest run
 npx tsc --noEmit
 ```
 
-The API tests run against the real Express app and a real database, with Cognito replaced by a test header and S3 presigning mocked (no AWS or OpenAI calls). Never point them at the development database.
+The API tests run against the real Express app and a real database, with Cognito replaced by a test header S3 presigning mocked and the OpenAI calls mocked (no AWS or OpenAI requests). Never point them at the development database.
 
 ## API at a glance
 
@@ -140,5 +143,6 @@ Every route needs a Cognito ID token (`Authorization: Bearer <token>`).
 | Recurring expenses | `/households/:id/rules` (create, list, get, update, delete) |
 | Month views | `GET /households/:id/calendar?month=`, `GET /households/:id/summary?month=` |
 | Receipts | `POST /households/:id/receipts` (a presigned upload URL), `POST /households/:id/receipts/analyze` (the suggested expense) |
+| Ask AI | `POST /households/:id/ask` (premium; a question and the recent chat, answered from the household's data) |
 
 [claude.md](claude.md) documents every endpoint, its rules and error responses, and the data model behind them.
