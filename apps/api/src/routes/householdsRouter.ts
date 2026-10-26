@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { HttpError } from "../middleware/errorHandler.js";
 import { requireMember, requireOwner } from "../middleware/household.js";
-import { validName, validCurrency, validTimeZone, validId, optional, validBoolean, validAmount, validDate, validDescription, validFrequency, validMonth, validReceiptKey, validReceiptContentType, validReceiptSize, validMonthlyLimit } from "../lib/validate.js";
+import { validName, validCurrency, validTimeZone, validId, optional, validBoolean, validAmount, validDate, validDescription, validFrequency, validMonth, validReceiptKey, validReceiptContentType, validReceiptSize, validMonthlyLimit, validQuestion, validHistory } from "../lib/validate.js";
 import { createHousehold, updateHousehold, leaveHousehold, removeMember, deleteHousehold, getMembers, getHouseholdData} from "../services/householdsService.js"
 import { createInvite, previewInvite, acceptInvite, listInvites, cancelInvite } from "../services/invitesService.js";
 import { createCategory, deleteCategory, updateCategory, getAllCategories } from "../services/categoriesService.js"
@@ -11,6 +11,8 @@ import { createRule, listRules, getRule, updateRule, deleteRule } from "../servi
 import { getCalendar } from "../services/calendarService.js";
 import { getSummary } from "../services/summaryService.js";
 import { analyzeReceipt, createReceiptUpload } from "../services/receiptsService.js";
+import { askQuestion } from "../services/askService.js";
+import { requirePremium } from "../middleware/premium.js";
 
 export const householdsRouter = Router();
 
@@ -383,4 +385,15 @@ householdsRouter.post("/:id/receipts/analyze", requireMember, async (req, res) =
     const validatedKey = validReceiptKey(key, householdId);
     const suggestion = await analyzeReceipt(householdId, req.user!.id, validatedKey);
     return res.status(200).json(suggestion);
+})
+
+/* ask ai */
+//a question about the household's spending in plain English, answered from its data (premium only)
+householdsRouter.post("/:id/ask", requireMember, requirePremium, async (req, res) => {
+    const { question, history } = req.body ?? { };
+    const householdId = req.membership!.householdId;
+    const validatedQuestion = validQuestion(question);
+    const validatedHistory = optional(history, validHistory) ?? [];
+    const answer = await askQuestion(householdId, req.user!.id, validatedQuestion, validatedHistory);
+    return res.status(200).json({ answer });
 })

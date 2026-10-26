@@ -104,3 +104,7 @@ export type ReceiptSuggestion = {
   categoryId: number | null;
   description: string | null;
 };
+
+// Ask AI (POST /households/:id/ask): the earlier messages sent as history, and the answer
+export type AskHistoryMessage = { role: "user" | "assistant"; content: string };
+export type AskAnswer = { answer: string };

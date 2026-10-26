@@ -154,6 +154,9 @@ export function fixtureResponse(path: string, scenario: Scenario): unknown {
     return { householdName: "Beach House", members: [{ name: "Noa", role: "OWNER" }, { name: "Eli", role: "MEMBER" }] };
   if (route === "/households/join")
     return { id: 99, name: "Beach House", defaultCurrency: "ILS", timeZone: "Asia/Jerusalem", monthlyLimit: null, role: "MEMBER" } satisfies Household;
+  // a made-up answer, after a short wait so the typing bubble shows
+  if (/^\/households\/\d+\/ask$/.test(route))
+    return new Promise((resolve) => setTimeout(() => resolve({ answer: "You spent 642.30 ILS on groceries in September, over 3 expenses." }), 1200));
   const one = /^\/households\/(\d+)\/expenses\/(\d+)$/.exec(route);
   const rule = /^\/households\/(\d+)\/rules(?:\/(\d+))?$/.exec(route);
   if (rule) {

@@ -158,3 +158,35 @@ export function validReceiptSize(value: unknown): number {
   }
   return value;
 }
+
+const MAX_QUESTION_LENGTH = 500;
+const MAX_HISTORY_MESSAGES = 10;
+const MAX_HISTORY_CONTENT_LENGTH = 2000;
+
+// an Ask AI question: string, trimmed, 1 to 500 characters
+export function validQuestion(value: unknown): string {
+  if (typeof value !== "string") throw new HttpError(400, "Question must be a string");
+  const question = value.trim();
+  if (question.length < 1 || question.length > MAX_QUESTION_LENGTH)
+    throw new HttpError(400, `Question must be 1-${MAX_QUESTION_LENGTH} characters`);
+  return question;
+}
+
+export type HistoryMessage = { role: "user" | "assistant"; content: string };
+
+// the chat's earlier messages, sent by the app for follow-up questions: at most 10 of { role, content }, content trimmed,
+// 1 to 2000 characters. Untrusted data: the model is told never to follow it as instructions.
+export function validHistory(value: unknown): HistoryMessage[] {
+  if (!Array.isArray(value) || value.length > MAX_HISTORY_MESSAGES)
+    throw new HttpError(400, `history must be an array of at most ${MAX_HISTORY_MESSAGES} messages`);
+  return value.map((item) => {
+    const { role, content } = (item ?? {}) as { role?: unknown; content?: unknown };
+    if (typeof item !== "object" || item === null || Array.isArray(item) || Object.keys(item).some((k) => k !== "role" && k !== "content"))
+      throw new HttpError(400, "Invalid history message");
+    if (role !== "user" && role !== "assistant") throw new HttpError(400, "Invalid history message");
+    if (typeof content !== "string") throw new HttpError(400, "Invalid history message");
+    const text = content.trim();
+    if (text.length < 1 || text.length > MAX_HISTORY_CONTENT_LENGTH) throw new HttpError(400, "Invalid history message");
+    return { role, content: text };
+  });
+}

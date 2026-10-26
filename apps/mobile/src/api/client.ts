@@ -15,7 +15,8 @@ type Options = { method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown };
 // refresh and expiry are handled here; it sends the ID token (the backend verifies ID tokens). Tokens are never logged.
 export async function apiFetch<T>(path: string, { method = "GET", body }: Options = {}): Promise<T> {
   if (FIXTURES) {
-    if (method !== "GET") throw new ApiError(400, "Not available in fixture mode");
+    // the one write fixtures answer: Ask AI, for screenshots of the chat
+    if (method !== "GET" && !/^\/households\/\d+\/ask$/.test(path)) throw new ApiError(400, "Not available in fixture mode");
     return fixtureResponse(path, fixtureScenario()) as T;
   }
   let idToken: string | undefined;

@@ -1,6 +1,6 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "./client";
-import type { CalendarMonth, Category, CreatedInvite, InvitePreview, Currency, Expense, Frequency, Household, Rule, Me, Member, MyHousehold, MySpending, Summary } from "./types";
+import type { AskAnswer, AskHistoryMessage, CalendarMonth, Category, CreatedInvite, InvitePreview, Currency, Expense, Frequency, Household, Rule, Me, Member, MyHousehold, MySpending, Summary } from "./types";
 
 // Every household query key starts with ["household", id], so switching households never shows another household's data.
 // Every endpoint used here exists in apps/api; in fixture mode (src/fixtures) apiFetch answers locally instead.
@@ -342,5 +342,13 @@ export function useDeleteRule(id: number) {
     mutationFn: ({ ruleId, deleteExpenses }: { ruleId: number; deleteExpenses: boolean }) =>
       apiFetch<void>(`/households/${id}/rules/${ruleId}?deleteExpenses=${deleteExpenses}`, { method: "DELETE" }),
     onSuccess: () => invalidateAfterExpenseChange(queryClient, id),
+  });
+}
+
+// a question about the household's spending (premium); nothing is cached, the chat lives in the screen
+export function useAsk(id: number) {
+  return useMutation({
+    mutationFn: (body: { question: string; history: AskHistoryMessage[] }) =>
+      apiFetch<AskAnswer>(`/households/${id}/ask`, { method: "POST", body }),
   });
 }

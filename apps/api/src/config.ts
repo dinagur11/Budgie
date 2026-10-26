@@ -17,4 +17,5 @@ export const config = {
   s3ReceiptsBucket: required("S3_BUCKET"),
   openaiApiKey: required("OPENAI_API_KEY"),
   openaiReceiptModel: required("OPENAI_RECEIPT_MODEL"),
+  openaiAskModel: required("OPENAI_ASK_MODEL"),
 };
