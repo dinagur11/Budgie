@@ -2,10 +2,11 @@ import { Router } from "express";
 import { getUserData, getActiveHouseholds, updateName, getMySpending } from "../services/meService.js";
 import { validMonth, validName } from "../lib/validate.js";
 import { HttpError } from "../middleware/errorHandler.js";
+import { cancelPremium, resumePremium } from "../services/premiumService.js";
 
 export const meRouter = Router();
 
-//get user id, name, email, isPremium
+//get user id, name, email and premium status
 meRouter.get("/", async (req, res) => {
     const userId:number = req.user!.id;
     const user = await getUserData(userId);
@@ -36,4 +37,14 @@ meRouter.patch("/", async (req, res) => {
     const validatedName : string = validName(name);
     const updated = await updateName(userId, validatedName);
     return res.status(200).json(updated);
+})
+
+//cancel premium at the end of the paid month (the user stays premium until premiumEndsAt)
+meRouter.post("/premium/cancel", async (req, res) => {
+    return res.status(200).json(await cancelPremium(req.user!.id));
+})
+
+//undo a cancel before premiumEndsAt
+meRouter.post("/premium/resume", async (req, res) => {
+    return res.status(200).json(await resumePremium(req.user!.id));
 })

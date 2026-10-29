@@ -2,12 +2,30 @@ import { Prisma } from "../../generated/prisma/client.js";
 import { HttpError } from "../middleware/errorHandler.js";
 import { prisma } from "../prisma.js";
 import { generateDueExpenses } from "./recurringRulesService.js";
+import { isPremiumActive, nextRenewal } from "../lib/premium.js";
+
+export const meSelect = { id: true, name: true, email: true, isPremium: true, premiumStartedAt: true, premiumEndsAt: true } as const;
+type MeRow = { id: number; name: string; email: string; isPremium: boolean; premiumStartedAt: Date | null; premiumEndsAt: Date | null };
+
+// The /me shape. isPremium is the effective value (an ended subscription reads false even before the daily cleanup),
+// and the dates are null unless premium. premiumRenewsAt is when a renewing subscription would end if canceled now
+// (null once canceled; premiumEndsAt is then the end date).
+export function toMeResponse(user: MeRow, now: Date = new Date()) {
+    const active = isPremiumActive(user, now);
+    return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        isPremium: active,
+        premiumStartedAt: active ? user.premiumStartedAt?.toISOString() ?? null : null,
+        premiumEndsAt: active ? user.premiumEndsAt?.toISOString() ?? null : null,
+        premiumRenewsAt: active && !user.premiumEndsAt ? nextRenewal(user.premiumStartedAt ?? now, now).toISOString() : null,
+    };
+}
 
 export async function getUserData(userId: number){
-    return prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, name: true, email: true, isPremium: true },
-    });
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: meSelect });
+    return user && toMeResponse(user);
 } 
 
 export async function getActiveHouseholds(userId: number){
@@ -25,11 +43,12 @@ export async function getActiveHouseholds(userId: number){
 }
 
 export async function updateName(userId: number, newName: string){
-    return prisma.user.update({
+    const user = await prisma.user.update({
         where: { id: userId },
         data: { name: newName},
-        select: { id: true, name: true, email: true, isPremium: true }
+        select: meSelect,
     });
+    return toMeResponse(user);
 }
 
 // what the user paid in a month, per currency, across the households they are an active member of

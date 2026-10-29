@@ -145,7 +145,10 @@ function mySpending(scenario: Scenario, requested?: string): MySpending {
 export function fixtureResponse(path: string, scenario: Scenario): unknown {
   const route = path.split("?")[0];
   const requestedMonth = /[?&]month=(\d{4}-\d{2})/.exec(path)?.[1];
-  if (route === "/me") return { id: 1, name: "Dana", email: "dana@example.com", isPremium: true } satisfies Me;
+  if (route === "/me") return {
+      id: 1, name: "Dana", email: "dana@example.com", isPremium: true,
+      premiumStartedAt: "2026-09-15T10:00:00.000Z", premiumEndsAt: null, premiumRenewsAt: "2026-11-15T10:00:00.000Z",
+    } satisfies Me;
   if (route === "/me/spending") return mySpending(scenario, requestedMonth);
   if (route === "/me/households")
     return scenario === "home" ? households.map((h): MyHousehold => ({ householdId: h.id, name: h.name, role: h.role })) : [];

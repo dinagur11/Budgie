@@ -40,7 +40,7 @@ Budgie is a mobile app for tracking a household's expenses together. Everyone in
 - **Multiple currencies.** Amounts are kept per currency and never converted or added across currencies.
 - **Accounts.** Sign up with email and a confirmation code (AWS Cognito), reset a forgotten password, change your name and password, and log out.
 - **Ask AI.** Ask about the household's spending in plain English: "How much did I spend on groceries last month?", "Where do we spend the most?", "What do our recurring expenses cost per month?". Follow-ups such as "and in March?" keep the context. The model never sees the database: it picks from a fixed set of queries (totals, monthly averages, biggest expenses, top categories, peak month, recurring costs, last purchase), and every number in the answer comes from those queries, per currency and only for your household. Premium only, up to 20 questions an hour.
-- **Premium.** Premium accounts can use Ask AI, get 10 receipt scans a day instead of 3, and have a Premium badge on their profile. Others see an invitation to join instead of the chat. Premium is set in the database for now; there is no way to upgrade in the app yet.
+- **Premium.** Premium accounts can use Ask AI, get 10 receipt scans a day instead of 3, and have a Premium badge on their profile. Others see an invitation to join instead of the chat. Premium is a monthly subscription: it can be canceled in Settings and stays active until the end of the paid month, and a cancel can be undone until then. Joining is set in the database for now; the app's "Join premium" shows a coming-soon screen.
 
 Coming next: monthly reports, notifications for the household, and a way to become premium.
 
@@ -98,7 +98,7 @@ npm run db:seed         # the built-in categories
 npm run dev             # http://localhost:3000 (or PORT)
 ```
 
-`.env` needs `DATABASE_URL`, `AWS_REGION`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `S3_BUCKET`, `OPENAI_API_KEY`, `OPENAI_RECEIPT_MODEL`, `OPENAI_ASK_MODEL` (the model for Ask AI, `gpt-5.4-mini`) and optionally `PORT`. AWS credentials come from the usual AWS SDK sources (environment, profile or role); on Railway, which has no AWS role, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. A second Railway service runs the daily invite cleanup (`node dist/src/jobs/cleanupInvites.js` on the cron schedule `0 3 * * *`) and needs only `DATABASE_URL`. Railway settings are kept in the dashboard, not in config files. Never commit it.
+`.env` needs `DATABASE_URL`, `AWS_REGION`, `COGNITO_USER_POOL_ID`, `COGNITO_CLIENT_ID`, `S3_BUCKET`, `OPENAI_API_KEY`, `OPENAI_RECEIPT_MODEL`, `OPENAI_ASK_MODEL` (the model for Ask AI, `gpt-5.4-mini`) and optionally `PORT`. AWS credentials come from the usual AWS SDK sources (environment, profile or role); on Railway, which has no AWS role, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. A second Railway service runs the daily cleanup of old invites and ended premium subscriptions (`node dist/src/jobs/dailyCleanup.js` on the cron schedule `0 3 * * *`) and needs only `DATABASE_URL`. Railway settings are kept in the dashboard, not in config files. Never commit it.
 
 ### Mobile app (`apps/mobile`)
 
@@ -135,7 +135,7 @@ Every route needs a Cognito ID token (`Authorization: Bearer <token>`).
 
 | Area | Routes |
 |---|---|
-| You | `GET/PATCH /me`, `GET /me/households`, `GET /me/spending?month=` |
+| You | `GET/PATCH /me`, `GET /me/households`, `GET /me/spending?month=`, `POST /me/premium/cancel` and `/resume` |
 | Households | `POST /households`, `GET/PATCH/DELETE /households/:id`, members list, leave, remove |
 | Invites | create, list and cancel on `/households/:id/invites`; `POST /households/join/preview`, `POST /households/join` |
 | Categories | `/households/:id/categories` (create, list, rename or archive, delete) |

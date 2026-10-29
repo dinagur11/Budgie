@@ -7,7 +7,16 @@ export type Currency = (typeof CURRENCIES)[number];
 
 export type Role = "OWNER" | "MEMBER";
 
-export type Me = { id: number; name: string; email: string; isPremium: boolean };
+// premium dates are ISO timestamps, null unless premium; premiumEndsAt is set once canceled, premiumRenewsAt while renewing
+export type Me = {
+  id: number;
+  name: string;
+  email: string;
+  isPremium: boolean;
+  premiumStartedAt: string | null;
+  premiumEndsAt: string | null;
+  premiumRenewsAt: string | null;
+};
 
 // GET /me/spending?month=YYYY-MM: what the caller paid, per currency (alphabetical), across their active households,
 // and the same per household (every active household, in the order of GET /me/households, totals [] when nothing)

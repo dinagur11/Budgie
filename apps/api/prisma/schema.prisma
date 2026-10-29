@@ -63,7 +63,9 @@ model User{
     cognitoId String @unique
     name String
     email String @unique
-    isPremium Boolean @default(false) // more receipt scans per day, and (later) spending Q&A
+    isPremium Boolean @default(false) // more receipt scans per day, and Ask AI; only counts while premiumEndsAt is null or in the future
+    premiumStartedAt DateTime? // start of the monthly subscription; its day of month is the renewal day
+    premiumEndsAt DateTime? // set on cancel to the end of the paid month; null while the subscription renews
     createdAt DateTime @default(now())
     paidExpenses Expense[] @relation("PaidExpenses")
     createdExpenses Expense[] @relation("CreatedExpenses")

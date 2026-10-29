@@ -219,6 +219,13 @@ describe("daily receipt cap on upload", () => {
     expect(res.body).toEqual({ error: "Daily receipt limit reached" });
   });
 
+  it("a canceled premium past its end date is back to 3 scans", async () => {
+    const { member, h } = await setup();
+    await prisma.user.update({ where: { id: member.id }, data: { isPremium: true, premiumEndsAt: new Date(Date.now() - 1000) } });
+    for (let i = 0; i < 3; i++) await scan(member.id, todayUtc());
+    expect((await upload(member, h.id, VALID)).status).toBe(429);
+  });
+
   it("is per user, across households", async () => {
     const { owner, member, h } = await setup();
     const other = await createHousehold("Other", member);

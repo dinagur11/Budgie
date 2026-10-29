@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { StyleSheet, Text, type TextInput } from "react-native";
+import { Alert, StyleSheet, Text, type TextInput } from "react-native";
 import { router } from "expo-router";
 import { AppHeader } from "../src/components/AppHeader";
 import { Banner } from "../src/components/Banner";
@@ -8,17 +8,18 @@ import { Card } from "../src/components/Card";
 import { Screen } from "../src/components/Screen";
 import { ErrorView, LoadingView } from "../src/components/StateViews";
 import { TextField } from "../src/components/TextField";
-import { useMe, useUpdateMe } from "../src/api/hooks";
+import { useMe, usePremiumChange, useUpdateMe } from "../src/api/hooks";
 import type { Me } from "../src/api/types";
 import { errorMessage } from "../src/api/errors";
 import { changePassword } from "../src/auth/auth";
 import { authErrorMessage } from "../src/auth/errors";
 import { useSession } from "../src/auth/session";
+import { cancelPremiumMessage, JOIN_PREMIUM_ROUTE, premiumDateLabel } from "../src/lib/premium";
 import { validateConfirmPassword, validateLoginPassword, validateName, validateNewPassword } from "../src/lib/validate";
 import { colors, type as t } from "../src/theme";
 
-// The user's own settings (opened from the households list's bar): change name (our API), change password
-// (Cognito only, never through our API) and log out. Household settings stay in the household's Settings tab.
+// The user's own settings (opened from the households list's bar): change name (our API), premium (cancel at the end of
+// the paid month, keep it, or join), change password (Cognito only, never through our API) and log out. Household settings stay in the household's Settings tab.
 export default function AccountSettingsScreen() {
   const me = useMe();
   const back = () => (router.canGoBack() ? router.back() : router.replace("/"));
@@ -30,7 +31,10 @@ export default function AccountSettingsScreen() {
       ) : !me.data ? (
         <LoadingView />
       ) : (
-        <NameCard me={me.data} />
+        <>
+          <NameCard me={me.data} />
+          <PremiumCard me={me.data} />
+        </>
       )}
       <PasswordCard />
       <LogOut />
@@ -67,6 +71,42 @@ function NameCard({ me }: { me: Me }) {
       <TextField label="Name" value={name} onChangeText={setName} error={error} maxLength={100} autoComplete="name" textContentType="name" returnKeyType="done" onSubmitEditing={save} />
       <Text style={styles.hint}>This is how the members of your households see you.</Text>
       <Button label="Save name" onPress={save} loading={update.isPending} disabled={!dirty} />
+    </Card>
+  );
+}
+
+function PremiumCard({ me }: { me: Me }) {
+  const change = usePremiumChange();
+
+  function confirmCancel(renewsAt: string) {
+    Alert.alert("Cancel membership?", cancelPremiumMessage(premiumDateLabel(renewsAt)), [
+      { text: "Keep premium", style: "cancel" },
+      { text: "Cancel membership", style: "destructive", onPress: () => change.mutate("cancel") },
+    ]);
+  }
+
+  let text: string;
+  let button: React.ReactNode;
+  if (!me.isPremium) {
+    text = "Get 10 receipt scans a day instead of 3, and ask questions about your spending with Ask AI.";
+    button = <Button label="Join premium" icon="workspace-premium" onPress={() => router.push(JOIN_PREMIUM_ROUTE)} />;
+  } else if (me.premiumEndsAt) {
+    text = `Your membership is canceled and ends on ${premiumDateLabel(me.premiumEndsAt)}. Until then you keep every premium feature.`;
+    button = <Button label="Keep premium" onPress={() => change.mutate("resume")} loading={change.isPending} />;
+  } else {
+    const renewsAt = me.premiumRenewsAt;
+    text = renewsAt ? `Your membership renews monthly. Next renewal: ${premiumDateLabel(renewsAt)}.` : "Your membership renews monthly.";
+    button = renewsAt && (
+      <Button label="Cancel membership" variant="danger" onPress={() => confirmCancel(renewsAt)} loading={change.isPending} />
+    );
+  }
+
+  return (
+    <Card style={styles.card}>
+      <Text style={styles.title}>Premium</Text>
+      {change.isError && <Banner message={errorMessage(change.error)} />}
+      <Text style={styles.text}>{text}</Text>
+      {button}
     </Card>
   );
 }
@@ -173,5 +213,6 @@ const styles = StyleSheet.create({
   heading: { ...t.headlineMd, color: colors.onSurface, marginTop: 8, marginBottom: 2 },
   card: { padding: 16, gap: 14 },
   title: { ...t.headlineSm, color: colors.onSurface },
+  text: { ...t.bodyMd, color: colors.onSurfaceVariant },
   hint: { ...t.bodySm, color: colors.onSurfaceVariant, marginTop: -8 },
 });

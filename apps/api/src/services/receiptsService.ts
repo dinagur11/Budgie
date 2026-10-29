@@ -8,6 +8,7 @@ import { extractReceipt, RawReceiptExtraction } from "../lib/llm/receiptExtracto
 import { todayInTimeZone } from "../services/expensesService.js";
 import { prisma } from "../prisma.js";
 import { MAX_RECEIPT_BYTES } from "../lib/validate.js";
+import { isPremiumActive } from "../lib/premium.js";
 
 export type ReceiptSuggestion = {
   isReceipt: boolean;
@@ -49,17 +50,17 @@ async function scansToday(userId: number, today: string, tx: Prisma.TransactionC
 async function assertScansLeft(userId: number, householdId: number) {
   const household = await prisma.household.findUnique({ where: { id: householdId }, select: { timeZone: true } });
   if (!household) throw new HttpError(404, "Household not found");
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { isPremium: true } });
-  if (await scansToday(userId, todayInTimeZone(household.timeZone)) >= dailyCap(user.isPremium))
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { isPremium: true, premiumEndsAt: true } });
+  if (await scansToday(userId, todayInTimeZone(household.timeZone)) >= dailyCap(isPremiumActive(user)))
     throw new HttpError(429, LIMIT_MESSAGE);
 }
 
 // Records one analysis before the LLM call. Locks the user row so two concurrent analyses can't both take the last scan;
-// the premium flag is read under the same lock.
+// the premium status is read under the same lock.
 async function reserveScan(userId: number, today: string) {
   await prisma.$transaction(async (tx) => {
-    const [user] = await tx.$queryRaw<{ isPremium: boolean }[]>`SELECT "isPremium" FROM "User" WHERE id = ${userId} FOR UPDATE`;
-    if (await scansToday(userId, today, tx) >= dailyCap(user.isPremium)) throw new HttpError(429, LIMIT_MESSAGE);
+    const [user] = await tx.$queryRaw<{ isPremium: boolean; premiumEndsAt: Date | null }[]>`SELECT "isPremium", "premiumEndsAt" FROM "User" WHERE id = ${userId} FOR UPDATE`;
+    if (await scansToday(userId, today, tx) >= dailyCap(isPremiumActive(user))) throw new HttpError(429, LIMIT_MESSAGE);
     await tx.receiptScan.create({ data: { userId, day: new Date(today) } });
   });
 }

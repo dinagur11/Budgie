@@ -12,6 +12,7 @@ import { ErrorView, LoadingView } from "../../src/components/StateViews";
 import { useHouseholdSelection } from "../../src/household/HouseholdContext";
 import { useAsk, useMe } from "../../src/api/hooks";
 import { errorMessage } from "../../src/api/errors";
+import { JOIN_PREMIUM_ROUTE } from "../../src/lib/premium";
 import {
   askErrorMessage, buildHistory, canRetryAsk, EXAMPLE_QUESTIONS, isPremiumRequired, MAX_QUESTION_LENGTH, type ChatMessage,
 } from "../../src/lib/ask";
@@ -55,7 +56,7 @@ function PremiumUpsell() {
       <Text style={styles.upsellText}>This feature is only available for premium users.</Text>
       <Button
         label="Join now"
-        onPress={() => router.push({ pathname: "/coming-soon", params: { title: "Coming soon", text: "Joining premium is coming soon." } })}
+        onPress={() => router.push(JOIN_PREMIUM_ROUTE)}
       />
     </Card>
   );

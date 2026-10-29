@@ -248,6 +248,15 @@ export function useUpdateMe() {
   });
 }
 
+// cancel at the end of the paid month, or undo that before the end date; both answer with the /me shape
+export function usePremiumChange() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (action: "cancel" | "resume") => apiFetch<Me>(`/me/premium/${action}`, { method: "POST" }),
+    onSuccess: (me) => queryClient.setQueryData(keys.me, me),
+  });
+}
+
 export function useExpense(id: number | null, expenseId: number | null) {
   return useQuery({
     queryKey: keys.expense(id ?? 0, expenseId ?? 0),

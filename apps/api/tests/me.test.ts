@@ -1,19 +1,25 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { prisma, as, anon, createUser, createHousehold, addMember, expectNoSensitiveFields } from "./helpers.js";
 
+const NOT_PREMIUM = { premiumStartedAt: null, premiumEndsAt: null, premiumRenewsAt: null };
+
 describe("GET /me", () => {
   it("returns id, name and email only", async () => {
     const user = await createUser("Dana");
     const res = await as(user).get("/me");
     expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({ id: user.id, name: "Dana", email: user.email, isPremium: false });
+    expect(res.body).toStrictEqual({ id: user.id, name: "Dana", email: user.email, isPremium: false, ...NOT_PREMIUM });
   });
 
   it("returns isPremium true for a premium user", async () => {
     const user = await createUser("Dana");
-    await prisma.user.update({ where: { id: user.id }, data: { isPremium: true } });
+    const startedAt = new Date("2026-01-15T10:00:00.000Z");
+    await prisma.user.update({ where: { id: user.id }, data: { isPremium: true, premiumStartedAt: startedAt } });
     const res = await as(user).get("/me");
-    expect(res.body).toStrictEqual({ id: user.id, name: "Dana", email: user.email, isPremium: true });
+    expect(res.body).toStrictEqual({
+      id: user.id, name: "Dana", email: user.email, isPremium: true,
+      premiumStartedAt: startedAt.toISOString(), premiumEndsAt: null, premiumRenewsAt: expect.any(String),
+    });
   });
 });
 
@@ -60,7 +66,7 @@ describe("PATCH /me", () => {
     const user = await createUser("Old");
     const res = await as(user).patch("/me").send({ name: "  New Name  ", email: "hacker@evil.com" });
     expect(res.status).toBe(200);
-    expect(res.body).toStrictEqual({ id: user.id, name: "New Name", email: user.email, isPremium: false });
+    expect(res.body).toStrictEqual({ id: user.id, name: "New Name", email: user.email, isPremium: false, ...NOT_PREMIUM });
     const db = await prisma.user.findUnique({ where: { id: user.id } });
     expect(db).toMatchObject({ name: "New Name", email: user.email, cognitoId: user.cognitoId });
   });
